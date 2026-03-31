@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Project Context Helper",
+  "description": "A developer tool designed to help users prepare their VS Code project codebase for Google AI Studio, specifically tailored for the PTE Flow project structure.",
+  "requestFramePermissions": []
+}
