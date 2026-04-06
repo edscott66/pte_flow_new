@@ -971,7 +971,7 @@ export default function ModuleScreen() {
                       Correct Order:
                     </Text>
                     {/* Using item.sentences ensures we have the right data for this specific question */}
-                    {item.sentences.map((sentence: string, idx: number) => (
+                    {item.sentences?.map((sentence: string, idx: number) => (
                       <View key={idx} style={styles.reOrderResultItem}>
                         <Text style={{ color: '#0369A1' }}>{idx + 1}. {sentence}</Text>
                       </View>
@@ -1239,7 +1239,7 @@ export default function ModuleScreen() {
         {isRetellLecture && ( 
           <View style={{flex: 1, justifyContent:'center', alignItems:'center'}}>
             <View style={{marginBottom: 30, alignItems:'center'}}>
-              <MaterialCommunityIcons name="microphone-message" size={80} color="#2563EB" />
+              <MaterialCommunityIcons name="microphone" size={80} color="#2563EB" />
               <Text style={{fontSize: 20, fontWeight: 'bold', marginTop: 10}}>{item.title}</Text>
               <Text style={{color:'#64748B'}}>Listen then Retell</Text>
             </View>
@@ -1264,8 +1264,7 @@ export default function ModuleScreen() {
                     <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>
                       Correct Order:
                     </Text>
-                    {/* We map through the sentences in the correct order for the user to see */}
-                    {questions[currentIndex].sentences.map((sentence, idx) => (
+                    {item.sentences?.map((sentence: string, idx: number) => (
                       <View key={idx} style={styles.reOrderResultItem}>
                         <Text style={{ color: '#0369A1' }}>{idx + 1}. {sentence}</Text>
                       </View>

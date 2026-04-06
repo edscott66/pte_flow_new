@@ -52,7 +52,7 @@ export const MODULES: ModuleType[] = [
     id: 'retell-lecture',
     title: '4. Re-tell Lecture',
     category: 'Part 1: Speaking & Writing',
-    icon: 'microphone-message',
+    icon: 'microphone',
     description: 'Listen to a lecture and retell it in your own words.',
     instructions: 'You will hear a lecture. After listening, you will have 40 seconds to retell what you just heard.',
     tips: 'Take notes on keywords and main ideas. Do not try to write down everything.',
