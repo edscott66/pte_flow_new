@@ -5,7 +5,6 @@ import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ImageViewing from "react-native-image-viewing";
 import { generateMockExam } from '../../utils/mockExamGenerator';
 
 // Import All Data Files
@@ -381,6 +380,10 @@ export default function ModuleScreen() {
 
   const handlePrev = () => { if (currentIndex > 0) scrollToQuestion(currentIndex - 1); };
 
+  const handleResetQuestion = () => {
+    scrollToQuestion(currentIndex);
+  };
+
   // --- LOGIC FUNCTIONS ---
   const startASQSequence = () => {
     const currentQ = questions[currentIndex];
@@ -405,6 +408,7 @@ export default function ModuleScreen() {
   };
 
   const proceedToNextASQ = () => {
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
     setAsqResultPopup(false);
     if (currentIndex < questions.length - 1) {
        scrollToQuestion(currentIndex + 1);
@@ -860,8 +864,8 @@ export default function ModuleScreen() {
   const isScrollEnabled = mode === 'IDLE' || mode === 'RESULT' || isReOrder || isFillBlanks || isSummarizeSpoken || isWriteDictation || isHighlightIncorrect || isAnyMC || isSummarizeWritten || isRetellLecture || isFillBlanksRW || isFillBlanksListening || isASQ || isEssay || isSummarizeGroup || isRespondSituation;
   const isAiProcessing = mode === 'PROCESSING';
   const renderItem = ({ item, index }: { item: any, index: number }) => (
-    <View style={styles.fullScreenPage}>
-      <View style={styles.card}>
+    <View style={[styles.fullScreenPage, mode !== 'RESULT' ? { flex: 1 } : { paddingBottom: 5, height: 'auto' }]}>
+      <View style={[styles.card, mode !== 'RESULT' ? { flex: 1 } : { padding: 12, minHeight: 80, maxHeight: 150 }]}>
         {/* --- UPDATED QUESTION INDEX --- */}
         <Text style={styles.questionIndex}>
             {id === 'mock-exam' ? `Task ${index + 1} of ${questions.length}` : `Question ${index + 1} of ${questions.length}`}
@@ -896,7 +900,7 @@ export default function ModuleScreen() {
              </View>
         )}
         {isASQ && (
-            <View style={{flex: 1, justifyContent:'center', alignItems:'center'}}>
+            <View style={[{justifyContent:'center', alignItems:'center'}, mode !== 'RESULT' ? {flex: 1} : {minHeight: 80}]}>
                 <MaterialCommunityIcons name="comment-question-outline" size={80} color={mode === 'RECORDING' ? '#EF4444' : '#2563EB'} />
                 <Text style={{fontSize: 18, marginTop: 20, textAlign:'center', color: '#64748B'}}>
                     {mode === 'PLAYING_AUDIO' ? "Listening..." : mode === 'RECORDING' ? "Speak Now!" : mode === 'PROCESSING' ? "Checking..." : mode === 'WAITING_NEXT' ? "Ready..." : "Press Start"}
@@ -904,19 +908,21 @@ export default function ModuleScreen() {
             </View>
         )}
         {isReadAloud && ( 
-          <ScrollView style={styles.textScroll} contentContainerStyle={styles.textScrollContent}>
+          <ScrollView style={[styles.textScroll, mode !== 'RESULT' && { flex: 1 }]} contentContainerStyle={styles.textScrollContent}>
             <Text style={styles.questionText}>{item.text}</Text>
           </ScrollView> 
         )}
         {/* 3. REPEAT SENTENCE (Hidden Text) */}
           {isRepeatSentence && (
-            <View style={styles.audioPlaceholder}>
+            <View style={[styles.audioPlaceholder, mode !== 'RESULT' && { flex: 1 }]}>
                {/* ONLY show text if we have a result. Otherwise, show a listening icon. */}
                {mode === 'RESULT' ? (
-                  <ScrollView style={styles.textScroll} contentContainerStyle={styles.textScrollContent}>
-                      <Text style={{fontWeight: 'bold', color: '#64748B', marginBottom: 5}}>Transcript:</Text>
-                      <Text style={styles.questionText}>{item.text}</Text>
-                  </ScrollView>
+                  <View style={{alignItems: 'center', justifyContent: 'center', height: 40, flexDirection: 'row', gap: 8}}>
+                      <MaterialCommunityIcons name="check-decagram" size={20} color="#10B981" />
+                      <Text style={{color: '#059669', fontWeight: 'bold', fontSize: 14}}>
+                          Analysis Complete
+                      </Text>
+                  </View>
                ) : (
                   <View style={{alignItems: 'center', justifyContent: 'center', height: 150}}>
                       <MaterialCommunityIcons name="waveform" size={60} color="#CBD5E1" />
@@ -942,7 +948,7 @@ export default function ModuleScreen() {
             </View>
           )}
         {isDescribeImage && ( 
-          <View style={styles.imageContainer}>
+          <View style={[styles.imageContainer, mode !== 'RESULT' && { flex: 1 }]}>
             <TouchableOpacity onPress={() => { if(item.image) { setCurrentZoomImage(item.image); setIsImageViewVisible(true); } }} activeOpacity={0.8} style={{width:'100%', alignItems:'center'}}>
               {item.image ? ( <Image source={{ uri: item.image }} style={styles.chartImage} resizeMode="contain" /> ) : ( 
                 <View style={styles.missingImage}><MaterialCommunityIcons name="image-off" size={40} color="#ccc" /><Text>Image Missing</Text></View> 
@@ -953,7 +959,7 @@ export default function ModuleScreen() {
           </View> 
         )}
         {isReOrder && ( 
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
             <Text style={styles.reOrderTitle}>{item.title}</Text>
             
             {/* --- SHOW RESULTS IF SCORED --- */}
@@ -966,17 +972,24 @@ export default function ModuleScreen() {
                 >
                   <Text style={styles.resultTitle}>Score: {reOrderScore.score} / {reOrderScore.max}</Text>
                   
-                  <View style={{ marginTop: 20 }}>
-                    <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>
-                      Correct Order:
-                    </Text>
-                    {/* Using item.sentences ensures we have the right data for this specific question */}
-                    {item.sentences?.map((sentence: string, idx: number) => (
-                      <View key={idx} style={styles.reOrderResultItem}>
-                        <Text style={{ color: '#0369A1' }}>{idx + 1}. {sentence}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  {reOrderScore.score === reOrderScore.max ? (
+                    <View style={{ marginTop: 20 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>
+                        Correct Order:
+                      </Text>
+                      {item.sentences?.map((sentence: string, idx: number) => (
+                        <View key={idx} style={styles.reOrderResultItem}>
+                          <Text style={{ color: '#0369A1' }}>{idx + 1}. {sentence}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FFF5F5', borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' }}>
+                      <Text style={{ color: '#B91C1C', fontStyle: 'italic', textAlign: 'center' }}>
+                        The correct order is hidden. Please try again to figure out the logical flow!
+                      </Text>
+                    </View>
+                  )}
                 </ScrollView>
               </View>
             ) : (
@@ -1007,7 +1020,7 @@ export default function ModuleScreen() {
           </View>
         )}
         {isFillBlanks && ( 
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
             <Text style={styles.reOrderTitle}>{item.title}</Text>
             <ScrollView contentContainerStyle={styles.fibContainer}>
               <View style={styles.fibTextWrapper}>
@@ -1026,7 +1039,7 @@ export default function ModuleScreen() {
           </View> 
         )}
         {isFillBlanksRW && (
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
             <View style={styles.wordBankContainer}>
               <Text style={styles.areaLabel}>Choices:</Text>
               <View style={styles.wordBankGrid}>
@@ -1050,7 +1063,7 @@ export default function ModuleScreen() {
           </View>
         )}
         {isFillBlanksListening && (
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
             <View style={styles.audioControlRow}>
                 <TouchableOpacity style={styles.miniPlayBtn} onPress={mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayLFibAudio}>
                   <MaterialCommunityIcons name={mode === 'PLAYING_AUDIO' ? "stop-circle" : "play-circle"} size={32} color={mode === 'PLAYING_AUDIO' ? "#EF4444" : "#2563EB"} />
@@ -1237,7 +1250,7 @@ export default function ModuleScreen() {
              </ScrollView>
           )}
         {isRetellLecture && ( 
-          <View style={{flex: 1, justifyContent:'center', alignItems:'center'}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1, justifyContent:'center', alignItems:'center'}}>
             <View style={{marginBottom: 30, alignItems:'center'}}>
               <MaterialCommunityIcons name="microphone" size={80} color="#2563EB" />
               <Text style={{fontSize: 20, fontWeight: 'bold', marginTop: 10}}>{item.title}</Text>
@@ -1272,10 +1285,10 @@ export default function ModuleScreen() {
                   </View>
                 </ScrollView>
 
-                <View style={{ padding: 15, borderTopWidth: 1, borderColor: '#E2E8F0' }}>
-                  <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-                    <Text style={styles.btnText}>Next Question</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
+                <View style={{ padding: 12, borderTopWidth: 1, borderColor: '#E2E8F0' }}>
+                  <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
+                    <Text style={styles.btnTextSmall}>Next Question</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1283,7 +1296,7 @@ export default function ModuleScreen() {
           </View>
         )}
         {(isSummarizeSpoken || isWriteDictation || isSummarizeWritten) && ( 
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
             {isSummarizeWritten && (
               <View style={{marginBottom: 10}}>
                 <Text style={styles.reOrderTitle}>{item.title}</Text>
@@ -1314,7 +1327,7 @@ export default function ModuleScreen() {
           </View>
         )}
         {isEssay && (
-          <View style={{flex: 1}}>
+          <View style={{flex: mode === 'RESULT' ? 0 : 1}}>
              <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
                 <Text style={{fontWeight:'bold', color:'#64748B'}}>Time Remaining:</Text>
                 <Text style={{fontWeight:'bold', fontSize:18, color: timeLeft < 120 ? '#EF4444' : '#2563EB'}}>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
@@ -1421,7 +1434,14 @@ export default function ModuleScreen() {
   if (!moduleInfo) return <View><Text>Module not found</Text></View>;
   if (questions.length === 0) return <View style={styles.centerContainer}><Text>Coming Soon</Text></View>;
 
-return (
+  const isAnyIncorrect = !!(
+    (reOrderScore && reOrderScore.score < reOrderScore.max) ||
+    (fillBlankScore && fillBlankScore.score < fillBlankScore.max) ||
+    (rwResult && rwResult.score < rwResult.max) ||
+    (lFibResult && lFibResult.score < lFibResult.max)
+  );
+
+  return (
     <SafeAreaView style={styles.container}>
       {/* --- UPDATED HEADER START --- */}
       <View style={styles.header}>
@@ -1437,7 +1457,7 @@ return (
             {id !== 'mock-exam' && (
                 <View style={styles.scoreBadge}>
                     <Text style={styles.scoreText}>
-                        Score: {currentSessionScore.toFixed(0)}/{questions.length}
+                        Correct: {currentSessionScore.toFixed(0)}/{questions.length}
                     </Text>
                 </View>
             )}
@@ -1450,7 +1470,7 @@ return (
         <View style={styles.headerRight} />
       </View>
 
-      <View style={styles.carouselContainer}>
+      <View style={[styles.carouselContainer, mode !== 'RESULT' ? { flex: 1 } : { height: 180 }]}>
         {/* Render only the CURRENT question. No FlatList, no memory bugs! */}
         {questions.length > 0 && renderItem({ item: questions[currentIndex], index: currentIndex })}
       </View>
@@ -1466,39 +1486,81 @@ return (
         </ScrollView>
       </View>
 
-<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{width: '100%'}}>
+<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[{width: '100%'}, mode === 'RESULT' && {flex: 1}]}>
         {((!isSummarizeGroup && !isRespondSituation) || mode === 'RESULT') && (
-          <View style={styles.controls}>
+          <View style={[styles.controls, mode === 'RESULT' && { flex: 1 }]}>
              {/* TIMER */}
              {mode === 'RECORDING' && <View style={styles.timerBox}><Text style={styles.timerCount}>{timeLeft}</Text></View>}
              
              {/* MAIN RESULTS BOX (Speaking/Writing) */}
              {(mode === 'RESULT' && result && !isASQ) && (
-               <View style={[styles.resultBox, { maxHeight: 600, minHeight: 300, paddingBottom: 0, overflow: 'hidden' }]}>
-                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 15, paddingBottom: 20 }}>
+               <View style={[styles.resultBox, { flex: 1, paddingBottom: 0, overflow: 'hidden' }]}>
+                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 15, paddingBottom: 10 }}>
                       <Text style={styles.resultTitle}>Score: {result.overall}/90</Text>
                       
-                      <View style={{marginBottom: 15}}>
-                          {result.breakdown && Object.entries(result.breakdown).map(([k,v]:any) => (
-                             <FeedbackRow key={k} label={k.toUpperCase()} text={v.toString()} />
-                          ))}
+                      <View style={{ backgroundColor: '#EFF6FF', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                          <Text style={{ color: '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                             Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
+                          </Text>
                       </View>
                       
-                      <View style={{backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#059669'}}>
-                          <Text style={{fontWeight: 'bold', color: '#065F46', marginBottom: 5}}>AI Feedback:</Text>
+                      <View style={{marginBottom: 15}}>
+                          {result.breakdown && Object.entries(result.breakdown).map(([k,v]:any) => {
+                             if (k.toLowerCase() === 'pronunciation' && result.overall < 70) return null;
+                             return <FeedbackRow key={k} label={k.toUpperCase()} text={v.toString()} />;
+                          })}
+                      </View>
+                      
+                      <View style={{backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#059669', marginBottom: 15}}>
+                          <Text style={{fontWeight: 'bold', color: '#065F46', marginBottom: 5}}>Reason for Score:</Text>
                           <Text style={{color: '#064E3B', lineHeight: 22}}>{result.feedback}</Text>
                       </View>
 
-                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture) && (
+                      <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                          <MaterialCommunityIcons name="chevron-double-down" size={20} color="#94A3B8" />
+                          <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: 'bold' }}>SCROLL FOR MORE FEEDBACK</Text>
+                      </View>
+
+                      {result.mistakes && result.mistakes.length > 0 && (
+                        <View style={{backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#EF4444', marginBottom: 15}}>
+                            <Text style={{fontWeight: 'bold', color: '#991B1B', marginBottom: 5}}>Word-Level Feedback:</Text>
+                            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                                {result.mistakes.map((m: any, i: number) => (
+                                    <View key={i} style={{backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#FEE2E2'}}>
+                                        <Text style={{fontSize: 12, color: '#1E293B'}}><Text style={{fontWeight: 'bold'}}>{m.word}</Text> ({m.label})</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                      )}
+
+                      {result.sectionFeedback && Object.keys(result.sectionFeedback).length > 0 && (
+                        <View style={{marginTop: 10, marginBottom: 20}}>
+                            <Text style={{fontWeight: 'bold', color: '#1E293B', marginBottom: 10, fontSize: 16}}>Detailed Section Feedback:</Text>
+                            {Object.entries(result.sectionFeedback).map(([key, value]: any) => (
+                                <View key={key} style={{backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0'}}>
+                                    <Text style={{fontWeight: 'bold', color: '#2563EB', textTransform: 'capitalize', marginBottom: 4}}>{key.replace(/([A-Z])/g, ' $1')}</Text>
+                                    <Text style={{color: '#475569', fontSize: 13, lineHeight: 18}}>{value}</Text>
+                                </View>
+                            ))}
+                        </View>
+                      )}
+
+                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture) && result.overall >= 70 && (
                          <TouchableOpacity style={{marginTop: 20, alignSelf: 'center'}} onPress={() => setShowModelAnswer(true)}>
                             <Text style={{color: '#2563EB', fontWeight:'bold', textDecorationLine: 'underline'}}>View Top Scoring Answer</Text>
                          </TouchableOpacity>
                       )}
                   </ScrollView>
-                  <View style={{ padding: 15, borderTopWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#fff' }}>
-                      <TouchableOpacity style={[styles.nextBtn, { width: '100%', justifyContent: 'center' }]} onPress={handleNext}>
-                         <Text style={styles.btnText}>Next Question</Text>
-                         <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
+                  <View style={{ width: '100%', padding: 8, borderTopWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#ECFDF5', gap: 6 }}>
+                      {result.overall < 70 && (
+                        <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
+                           <Text style={styles.btnTextSmall}>Try Again</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity style={[styles.nextBtnSmall, result.overall < 70 && { backgroundColor: '#94A3B8' }]} onPress={handleNext}>
+                         <Text style={styles.btnTextSmall}>{result.overall < 70 ? 'Skip to Next' : 'Next Question'}</Text>
+                         <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" style={{ position: 'absolute', right: 12 }} />
                       </TouchableOpacity>
                   </View>
                </View>
@@ -1508,6 +1570,7 @@ return (
              {mcResult && (
                 <View style={[
                   styles.resultBox, 
+                  mode === 'RESULT' && { flex: 1 },
                   mcResult.score < mcResult.max ? { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 } : {}
                 ]}>
                   <View style={{marginBottom: 10, alignItems: 'center'}}>
@@ -1527,6 +1590,12 @@ return (
                   <Text style={[styles.resultTitle, {fontSize: 16, color: '#334155', textAlign: 'center'}]}>
                     Score: {mcResult.score} / {mcResult.max}
                   </Text>
+
+                  <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                      <Text style={{ color: '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                         Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
+                      </Text>
+                  </View>
                   
                   {/* IF WRONG: Show encouragement to re-read/listen */}
                   {mcResult.score < mcResult.max && (
@@ -1545,10 +1614,17 @@ return (
                     </View>
                   )}
 
-                  <TouchableOpacity style={[styles.nextBtn, {width: '100%', justifyContent: 'center', marginTop: 20}]} onPress={handleNext}>
-                    <Text style={styles.btnText}>Next Question</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
-                  </TouchableOpacity>
+                  <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: '#ECFDF5', borderTopWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                    {mcResult.score < mcResult.max && (
+                      <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
+                         <Text style={styles.btnTextSmall}>Try Again</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={[styles.nextBtnSmall, mcResult.score < mcResult.max && { backgroundColor: '#94A3B8' }]} onPress={handleNext}>
+                       <Text style={styles.btnTextSmall}>{mcResult.score < mcResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                       <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
              )}
 
@@ -1556,6 +1632,12 @@ return (
              {dictationResult && (
                 <View style={styles.resultBox}>
                     <Text style={styles.resultTitle}>Score: {dictationResult.score} / {dictationResult.max}</Text>
+                    
+                    <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginBottom: 15, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                        <Text style={{ color: '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                           Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
+                        </Text>
+                    </View>
                     
                     {/* ONLY SHOW CORRECT ANSWER IF THEY GOT IT 100% RIGHT */}
                     {dictationResult.score === dictationResult.max ? (
@@ -1567,16 +1649,76 @@ return (
                         <Text style={{color:'#B91C1C', fontStyle:'italic', marginTop: 5}}>Incorrect. Listen again and keep practicing!</Text>
                     )}
 
-                    <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-                        <Text style={styles.btnText}>Next Question</Text>
-                        <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
-                    </TouchableOpacity>
+                    {dictationResult.score < dictationResult.max ? (
+                        <View style={{marginTop: 10, padding: 10, backgroundColor: '#FFF5F5', borderRadius: 8, marginBottom: 15}}>
+                            <Text style={{color: '#B91C1C', fontStyle: 'italic', textAlign: 'center'}}>
+                                The correct answer is hidden. Try again to match it perfectly!
+                            </Text>
+                        </View>
+                    ) : null}
+
+                    <View style={{ gap: 8, width: '100%', padding: 12, backgroundColor: '#ECFDF5', borderTopWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                        {dictationResult.score < dictationResult.max && (
+                            <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
+                                <Text style={styles.btnTextSmall}>Try Again</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={[styles.nextBtnSmall, dictationResult.score < dictationResult.max && { backgroundColor: '#94A3B8' }]} onPress={handleNext}>
+                            <Text style={styles.btnTextSmall}>{dictationResult.score < dictationResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                            <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
              )}
 
              {/* OTHER RESULTS (Highlight/Blanks/Reorder) */}
-             {highlightResult && (<View style={styles.resultBox}><Text style={styles.resultTitle}>Score: {highlightResult.score}/{highlightResult.max}</Text><Text style={styles.resultSub}>Green = Correctly Identified | Red = Wrongly Selected</Text><TouchableOpacity style={styles.nextBtn} onPress={handleNext}><Text style={styles.btnText}>Next Question</Text><MaterialCommunityIcons name="arrow-right" size={20} color="#fff" /></TouchableOpacity></View>)}
-             {(reOrderScore || fillBlankScore || rwResult || lFibResult) && (<View style={styles.resultBox}><Text style={styles.resultTitle}>Score: {reOrderScore ? reOrderScore.score : fillBlankScore ? fillBlankScore.score : rwResult ? rwResult.score : lFibResult?.score} / {reOrderScore ? reOrderScore.max : fillBlankScore ? fillBlankScore.max : rwResult ? rwResult.max : lFibResult?.max}</Text><TouchableOpacity style={styles.nextBtn} onPress={handleNext}><Text style={styles.btnText}>Next Question</Text><MaterialCommunityIcons name="arrow-right" size={20} color="#fff" /></TouchableOpacity></View>)}
+             {highlightResult && (
+                <View style={styles.resultBox}>
+                  <Text style={styles.resultTitle}>Score: {highlightResult.score}/{highlightResult.max}</Text>
+                  
+                  <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                      <Text style={{ color: '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                         Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
+                      </Text>
+                  </View>
+                  
+                  <Text style={styles.resultSub}>Green = Correctly Identified | Red = Wrongly Selected</Text>
+                  <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: '#ECFDF5', borderTopWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                    {highlightResult.score < highlightResult.max && (
+                        <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
+                           <Text style={styles.btnTextSmall}>Try Again</Text>
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={[styles.nextBtnSmall, highlightResult.score < highlightResult.max && { backgroundColor: '#94A3B8' }]} onPress={handleNext}>
+                        <Text style={styles.btnTextSmall}>{highlightResult.score < highlightResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+             {(reOrderScore || fillBlankScore || rwResult || lFibResult) && (
+                <View style={styles.resultBox}>
+                  <Text style={styles.resultTitle}>Score: {reOrderScore ? reOrderScore.score : fillBlankScore ? fillBlankScore.score : rwResult ? rwResult.score : (lFibResult?.score ?? 0)} / {reOrderScore ? reOrderScore.max : fillBlankScore ? fillBlankScore.max : rwResult ? rwResult.max : (lFibResult?.max ?? 0)}</Text>
+                  
+                  <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                      <Text style={{ color: '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                         Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
+                      </Text>
+                  </View>
+                  
+                   <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: '#ECFDF5', borderTopWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                    {isAnyIncorrect && (
+                        <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
+                           <Text style={styles.btnTextSmall}>Try Again</Text>
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={[styles.nextBtnSmall, isAnyIncorrect && { backgroundColor: '#94A3B8' }]} onPress={handleNext}>
+                        <Text style={styles.btnTextSmall}>{isAnyIncorrect ? 'Skip to Next' : 'Next Question'}</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
              {/* START BUTTONS */}
              {mode === 'IDLE' && !result && !mcResult && !dictationResult && !highlightResult && !reOrderScore && !fillBlankScore && !rwResult && !lFibResult && (
@@ -1621,7 +1763,91 @@ return (
 
       {/* MODALS AND ZOOM */}
       <Modal animationType="slide" transparent={true} visible={showModelAnswer} onRequestClose={() => setShowModelAnswer(false)}><View style={styles.modalOverlay}><View style={styles.modalContent}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Model Answer</Text><TouchableOpacity onPress={() => setShowModelAnswer(false)}><MaterialCommunityIcons name="close-circle" size={30} color="#64748B" /></TouchableOpacity></View><ScrollView style={{maxHeight: 300}}><Text style={styles.modelText}>{questions[currentIndex]?.modelAnswer || "No model answer available."}</Text></ScrollView></View></View></Modal>
-      <ImageViewing images={currentZoomImage ? [{ uri: typeof currentZoomImage === 'string' ? currentZoomImage : Image.resolveAssetSource(currentZoomImage)?.uri }] : []} imageIndex={0} visible={isImageViewVisible} onRequestClose={() => setIsImageViewVisible(false)} />
+      <Modal visible={isImageViewVisible} transparent={true} animationType="fade" onRequestClose={() => setIsImageViewVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 10 }} onPress={() => setIsImageViewVisible(false)}>
+            <MaterialCommunityIcons name="close-circle" size={40} color="#fff" />
+          </TouchableOpacity>
+          {currentZoomImage && (
+            <Image 
+              source={typeof currentZoomImage === 'string' ? { uri: currentZoomImage } : currentZoomImage} 
+              style={{ width: '95%', height: '80%' }} 
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* ASQ RESULT MODAL */}
+      <Modal visible={asqResultPopup} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: result?.content && result.content > 60 ? '#F0FDF4' : '#FEF2F2' }]}>
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              {result?.content && result.content > 60 ? (
+                <MaterialCommunityIcons name="check-circle" size={60} color="#059669" />
+              ) : (
+                <MaterialCommunityIcons name="close-circle" size={60} color="#DC2626" />
+              )}
+              <Text style={{ fontSize: 24, fontWeight: 'bold', marginTop: 10, color: result?.content && result.content > 60 ? '#059669' : '#DC2626' }}>
+                {result?.content && result.content > 60 ? 'Correct!' : 'Incorrect'}
+              </Text>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 5 }}>Your Answer:</Text>
+              <Text style={{ color: '#475569', fontStyle: 'italic' }}>"{userSummary || "No speech detected"}"</Text>
+            </View>
+
+            {result?.content && result.content > 60 ? (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 5 }}>Expected Answer:</Text>
+                <Text style={{ color: '#059669', fontWeight: 'bold' }}>{questions[currentIndex]?.answer}</Text>
+              </View>
+            ) : (
+              <View style={{ marginBottom: 20, padding: 10, backgroundColor: '#FFF5F5', borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' }}>
+                <Text style={{ color: '#B91C1C', fontStyle: 'italic', textAlign: 'center' }}>
+                  The correct answer is hidden. Try again to get it right!
+                </Text>
+              </View>
+            )}
+
+            <View style={{ marginBottom: 20, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' }}>
+              <Text style={{ color: '#64748B', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' }}>Session Progress</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2563EB' }}>
+                Total Correct: {currentSessionScore.toFixed(0)} / {questions.length}
+              </Text>
+            </View>
+
+            {result?.content && result.content > 60 ? (
+              <TouchableOpacity 
+                style={[styles.nextBtnSmall, { width: '100%', justifyContent: 'center' }]} 
+                onPress={proceedToNextASQ}
+              >
+                <Text style={styles.btnTextSmall}>
+                  {currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Session'}
+                </Text>
+                <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+              </TouchableOpacity>
+            ) : (
+            <View style={{ gap: 8, width: '100%', padding: 12, backgroundColor: result?.content && result.content > 60 ? '#F0FDF4' : '#FEF2F2', borderTopWidth: 1, borderColor: result?.content && result.content > 60 ? '#D1FAE5' : '#FECACA', borderRadius: 16 }}>
+                <TouchableOpacity 
+                  style={styles.btnPrimarySmall} 
+                  onPress={handleResetQuestion}
+                >
+                  <Text style={styles.btnTextSmall}>Try Again</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.nextBtnSmall, { backgroundColor: '#94A3B8' }]} 
+                  onPress={proceedToNextASQ}
+                >
+                  <Text style={styles.btnTextSmall}>Skip to Next</Text>
+                  <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1669,41 +1895,44 @@ const styles = StyleSheet.create({
     textAlign: 'center', // Ensures long titles wrap nicely in the center
     lineHeight: 20,
   },
-  carouselContainer: { flex: 1 },
-  fullScreenPage: { width: width, flex: 1, padding: 20 },
-  card: { flex: 1, backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  carouselContainer: { },
+  fullScreenPage: { width: width, padding: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
   questionIndex: { color: '#64748B', marginBottom: 10, fontWeight: 'bold' },
   questionText: { fontSize: 20, lineHeight: 30, color: '#1E293B' },
   readingText: { fontSize: 16, lineHeight: 24, color: '#334155' },
   label: { fontSize: 12, color: '#94A3B8', fontWeight: 'bold', marginBottom: 4 },
-  textScroll: { flex: 1, width: '100%', minHeight: 100, maxHeight: 200,  marginBottom: 10, },
+  textScroll: { width: '100%', minHeight: 100, maxHeight: 200,  marginBottom: 10, },
   textScrollContent: { flexGrow: 1, justifyContent: 'center' },
-  audioPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  audioPlaceholder: { justifyContent: 'center', alignItems: 'center' },
   listenBox: { alignItems: 'center', gap: 10 },
   listenText: { fontSize: 18, color: '#64748B', fontWeight: '500' },
-  imageContainer: { flex: 1, alignItems: 'center', justifyContent: 'flex-start' },
+  imageContainer: { alignItems: 'center', justifyContent: 'flex-start' },
   
   // ZOOM STYLES
   chartImage: { width: '100%', height: 180, marginTop: 20, marginBottom: 10, backgroundColor: '#F1F5F9' },
   missingImage: { width: '100%', height: 180, backgroundColor:'#F1F5F9', alignItems:'center', justifyContent:'center', borderRadius:8, marginTop: 20 },
   imageTitle: { marginTop: 10, fontSize: 16, fontWeight:'600', color:'#334155', textAlign:'center'},
   zoomIcon: { position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 5 },
-  controls: { padding: 20, paddingBottom: 60, backgroundColor: '#F8FAFC', borderTopWidth: 1,  borderTopColor: '#E2E8F0', }, 
+  controls: { padding: 10, paddingBottom: 20, backgroundColor: '#F8FAFC', borderTopWidth: 1,  borderTopColor: '#E2E8F0', }, 
   timerBox: { alignItems: 'center', marginBottom: 20 },
   timerText: { fontSize: 16, color: '#64748B', marginBottom: 5, fontWeight: '600' },
   timerCount: { fontSize: 48, fontWeight: 'bold', color: '#1E293B' },
   textRed: { color: '#EF4444' },
   textGreen: { color: '#10B981' }, 
-   resultBox: { backgroundColor: '#ECFDF5', padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, alignItems: 'center', elevation: 3, width: '100%' },
+   resultBox: { backgroundColor: '#ECFDF5', padding: 10, borderRadius: 16, marginBottom: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, alignItems: 'center', elevation: 3, width: '100%' },
   resultTitle: { fontSize: 24, fontWeight: 'bold', color: '#059669', marginBottom: 5 },
   resultSub: { fontSize: 16, color: '#047857', marginBottom: 15 },
   idleControls: { flexDirection: 'column', alignItems: 'center', gap: 20, width: '100%' },
-  btnPrimary: { backgroundColor: '#2563EB', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
+  btnPrimary: { backgroundColor: '#2563EB', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
   modelBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B', shadowColor: '#F59E0B', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
   btnSecondary: { backgroundColor: '#E2E8F0', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
   btnDanger: { backgroundColor: '#EF4444', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
-  nextBtn: { backgroundColor: '#059669', padding: 12, borderRadius: 30, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20 },
+  nextBtn: { backgroundColor: '#059669', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  btnPrimarySmall: { backgroundColor: '#2563EB', height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  nextBtnSmall: { backgroundColor: '#059669', height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
   btnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  btnTextSmall: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   btnTextDark: { color: '#1E293B', fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
