@@ -546,7 +546,6 @@ export default function ModuleScreen() {
             setResult(res);
             setAsqResultPopup(true);
             setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
-            autoNextTimerRef.current = setTimeout(() => { if (currentIndex < questions.length - 1) proceedToNextASQ(); }, 5000);
             return; 
         }
 
@@ -1324,6 +1323,14 @@ export default function ModuleScreen() {
             {(isSummarizeSpoken || isSummarizeWritten) && (
               <View style={styles.wordCountRow}><Text style={[styles.wordCountText, (wordCount < 5 || wordCount > 75) ? {color: '#EF4444'} : {color: '#10B981'}]}>Words: {wordCount}</Text></View>
             )}
+            {mode === 'IDLE' && !result && !dictationResult && (
+              <TouchableOpacity 
+                style={[styles.btnPrimary, {marginTop: 15}]} 
+                onPress={isWriteDictation ? submitDictation : submitSummary}
+              >
+                <Text style={styles.btnText}>Submit Answer</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {isEssay && (
@@ -1721,7 +1728,7 @@ export default function ModuleScreen() {
               )}
 
              {/* START BUTTONS */}
-             {mode === 'IDLE' && !result && !mcResult && !dictationResult && !highlightResult && !reOrderScore && !fillBlankScore && !rwResult && !lFibResult && (
+             {mode === 'IDLE' && !result && !mcResult && !dictationResult && !highlightResult && !reOrderScore && !fillBlankScore && !rwResult && !lFibResult && !isSummarizeWritten && !isSummarizeSpoken && !isWriteDictation && (
                 <View style={styles.idleControls}>
                    <TouchableOpacity style={styles.btnPrimary} onPress={() => {
                        if (isPersonalIntro) {
