@@ -27,7 +27,7 @@ const getAI = () => {
  * Analyze speech for PTE tasks.
  * Uses Gemini as the primary engine for high-quality coaching and scoring.
  */
-export const analyzeSpeech = async (audioUri: string, questionText: string, questionType: string) => {
+export const analyzeSpeech = async (audioUri: string, questionText: string, questionType: string, imageUri?: string) => {
   try {
     if (!audioUri) throw new Error("No audio URI provided");
 
@@ -35,17 +35,35 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
       encoding: 'base64', 
     });
 
+    let base64Image = null;
+    if (imageUri) {
+      try {
+        base64Image = await FileSystem.readAsStringAsync(imageUri, {
+          encoding: 'base64',
+        });
+      } catch (e) {
+        console.error("Error reading image for analysis:", e);
+      }
+    }
+
     const prompt = `
-      Act as a professional PTE Academic examiner and coach. 
+      Act as a strict professional PTE Academic examiner and coach. 
       Task Type: ${questionType}
-      Target Sentence/Text: "${questionText}"
+      Target Sentence/Text/Topic: "${questionText}"
+      ${imageUri ? "An image is provided that the user is describing." : ""}
       
       Analyze the provided audio for PTE Academic standards (0-90 scoring).
+      
+      CRITICAL RULE:
+      If the audio is silent, contains only background noise, or no recognizable speech is present, you MUST:
+      - Set overall, pronunciation, fluency, and content scores to 0.
+      - Set userTranscript to "[No speech detected]".
+      - Provide feedback explaining that no speech was heard.
       
       Your Task:
       1. Transcribe what the user said as accurately as possible.
       2. Provide a score (0-90) for:
-         - Content (Accuracy against target text)
+         - Content (Accuracy against target text or image content)
          - Oral Fluency (Smoothness, rhythm, phrasing)
          - Pronunciation (Clarity, word stress, vowel/consonant accuracy)
       3. Provide an Overall Score (0-90).
@@ -72,12 +90,18 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
     `;
 
     const ai = getAI();
+    const contents: any[] = [
+      { text: prompt },
+      { inlineData: { mimeType: "audio/mp3", data: base64Audio } }
+    ];
+
+    if (base64Image) {
+      contents.push({ inlineData: { mimeType: "image/jpeg", data: base64Image } });
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [
-        { text: prompt },
-        { inlineData: { mimeType: "audio/mp3", data: base64Audio } }
-      ],
+      contents: contents,
       config: { 
         responseMimeType: "application/json",
         maxOutputTokens: 1000,

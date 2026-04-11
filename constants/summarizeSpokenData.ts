@@ -6,14 +6,14 @@ export const SUMMARIZE_SPOKEN_QUESTIONS = [
   title: 'Technology in Daily Life',
   transcript: "Technology is now part of almost everything we do. People use smartphones to communicate, shop, and learn new things. Many workplaces also depend on digital tools to complete tasks faster. However, some people worry that too much screen time can affect health and social skills. Finding a balance between using technology and taking breaks is important for a healthy lifestyle.",
   audioUrl: "https://storage.googleapis.com/pte_flow_audio/listening/Summarize%20Spoken%20Text/1.mp3",
-  modelAnswer: "Technology helps people work and communicate. It is useful, but too much screen time is not good. People need a balance to stay healthy."
+  modelAnswer: "The speaker discusses how technology has become integrated into nearly all aspects of modern life, including communication, shopping, learning, and workplace efficiency. While digital tools help people complete tasks faster, concerns are raised regarding the negative effects of excessive screen time on physical health and social skills. Ultimately, the speaker emphasizes that finding a balance between using technology and taking regular breaks is crucial for maintaining a healthy lifestyle."
 },
 {
   id: '2',
   title: 'Healthy Lifestyle Choices',
   transcript: "Living a healthy lifestyle means eating good food, exercising often, and getting enough sleep. These habits help the body stay strong and prevent sickness. Many people also try to relax by walking outside or spending time with family. Even small daily changes can make health better over time and help people feel happier and more energetic.",
   audioUrl: "https://storage.googleapis.com/pte_flow_audio/listening/Summarize%20Spoken%20Text/2.mp3",
-  modelAnswer: "A healthy life needs good food, exercise, and sleep. These habits help the body stay strong. Small changes can make health better."
+  modelAnswer: "The speaker explains that a healthy lifestyle consists of eating nutritious food, exercising regularly, and obtaining sufficient sleep, as these habits strengthen the body and prevent illness. Additionally, relaxation through outdoor walks or family time is recommended. The speaker concludes that even small daily changes can gradually improve health, leading to increased happiness and energy levels."
 },
 {
   id: '3',

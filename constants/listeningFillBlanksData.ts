@@ -11,7 +11,7 @@ export const LISTENING_FILL_BLANKS_QUESTIONS = [
       " and drink coffee. After that, I take the ", 
       " to work."
     ],
-    correctAnswers: ["seven", "breakfast", "toast", "bus", "six"]
+    correctAnswers: ["seven", "breakfast", "toast", "bus"]
   },
   {
     id: '2',
