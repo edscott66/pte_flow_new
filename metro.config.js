@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
@@ -8,6 +9,11 @@ config.resolver.blacklistRE = [
   /vite\.config\.ts$/,
   /dist-server\/.*/,
   /dist\/.*/,
+];
+
+// Ensure Metro can resolve all dependencies
+config.resolver.nodeModulesPaths = [
+  path.resolve(__dirname, 'node_modules'),
 ];
 
 module.exports = config;

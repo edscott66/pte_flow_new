@@ -15,7 +15,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
-    "jsx": "react-native",
+    "jsx": "react-jsx",
     "paths": {
       "@/*": [
         "./*"

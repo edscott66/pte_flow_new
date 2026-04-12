@@ -1,7 +1,26 @@
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scoreService } from '../../services/scoreService';
 
 export default function Profile() {
+  const [userName, setUserName] = useState('PTE Student');
+  const [score, setScore] = useState(0);
+  const [attemptedCount, setAttemptedCount] = useState(0);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const name = await scoreService.getUserName();
+      const s = await scoreService.getScore();
+      const attempted = await scoreService.getAttemptedQuestions();
+      
+      if (name) setUserName(name);
+      setScore(s);
+      setAttemptedCount(attempted.length);
+    };
+    loadData();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -10,19 +29,19 @@ export default function Profile() {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatar} />
-          <Text style={styles.name}>PTE Student</Text>
+          <Text style={styles.name}>{userName}</Text>
           <Text style={styles.target}>Target Score: 79</Text>
         </View>
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statNum}>12</Text>
+            <Text style={styles.statNum}>{attemptedCount}</Text>
             <Text style={styles.statLabel}>EXERCISES</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumGreen}>74</Text>
-            <Text style={styles.statLabel}>AVG SCORE</Text>
+            <Text style={styles.statNumGreen}>{score}</Text>
+            <Text style={styles.statLabel}>TOTAL SCORE</Text>
           </View>
         </View>
 

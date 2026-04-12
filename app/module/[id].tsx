@@ -32,8 +32,56 @@ import { ESSAY_QUESTIONS } from '../../constants/essayData';
 import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
 import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
 import { analyzeSpeech, analyzeWriting } from '../../services/geminiService';
+import { scoreService } from '../../services/scoreService';
+import { networkService } from '../../services/networkService';
+import { Config } from '../../constants/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+
+const CATEGORIES: Record<string, { title: string, tasks: { id: string, title: string, icon: string }[] }> = {
+  speaking: {
+    title: 'Speaking',
+    tasks: [
+      { id: 'read-aloud', title: 'Read Aloud', icon: 'microphone' },
+      { id: 'repeat-sentence', title: 'Repeat Sentence', icon: 'repeat' },
+      { id: 'describe-image', title: 'Describe Image', icon: 'image' },
+      { id: 'retell-lecture', title: 'Retell Lecture', icon: 'volume-high' },
+      { id: 'answer-short-question', title: 'Answer Short Question', icon: 'help-circle' },
+      { id: 'personal-intro', title: 'Personal Introduction', icon: 'account-voice' },
+    ]
+  },
+  writing: {
+    title: 'Writing',
+    tasks: [
+      { id: 'summarize-written', title: 'Summarize Written Text', icon: 'file-document-edit' },
+      { id: 'essay', title: 'Write Essay', icon: 'fountain-pen-tip' },
+    ]
+  },
+  reading: {
+    title: 'Reading',
+    tasks: [
+      { id: 'fill-blanks-rw', title: 'Reading & Writing: Fill in the Blanks', icon: 'format-list-bulleted' },
+      { id: 'multiple-choice', title: 'Multiple Choice (Multiple)', icon: 'checkbox-multiple-marked' },
+      { id: 're-order-paragraphs', title: 'Re-order Paragraphs', icon: 'sort' },
+      { id: 'fill-blanks', title: 'Reading: Fill in the Blanks', icon: 'format-list-checks' },
+      { id: 'multiple-choice-r-single', title: 'Multiple Choice (Single)', icon: 'checkbox-marked-circle' },
+    ]
+  },
+  listening: {
+    title: 'Listening',
+    tasks: [
+      { id: 'summarize-spoken', title: 'Summarize Spoken Text', icon: 'headphones' },
+      { id: 'multiple-choice-l-multi', title: 'Multiple Choice (Multiple)', icon: 'checkbox-multiple-marked' },
+      { id: 'fill-blanks-listening', title: 'Fill in the Blanks', icon: 'format-list-bulleted' },
+      { id: 'highlight-correct-summary', title: 'Highlight Correct Summary', icon: 'check-decagram' },
+      { id: 'multiple-choice-l-single', title: 'Multiple Choice (Single)', icon: 'checkbox-marked-circle' },
+      { id: 'select-missing-word', title: 'Select Missing Word', icon: 'music-note' },
+      { id: 'highlight-incorrect', title: 'Highlight Incorrect Words', icon: 'close-circle' },
+      { id: 'write-dictation', title: 'Write From Dictation', icon: 'keyboard' },
+    ]
+  }
+};
 
 type TimerMode = 'IDLE' | 'PLAYING_AUDIO' | 'PREP' | 'PREP_RETELL' | 'PREP_LISTENING' | 'RECORDING' | 'PROCESSING' | 'RESULT' | 'WAITING_NEXT';
 
@@ -43,6 +91,41 @@ export default function ModuleScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [bestScores, setBestScores] = useState<{[key: number]: number}>({});
+
+  const awardPointIfFirstAttempt = async (isCorrect: boolean) => {
+    if (!isCorrect) return;
+    
+    const q = questions[currentIndex];
+    const questionId = `${id}_${currentIndex}_${(q.text || q.topic || q.displayText || '').substring(0, 10)}`;
+    
+    const isFirst = await scoreService.isFirstAttempt(questionId);
+    if (isFirst) {
+      await scoreService.markAsAttempted(questionId);
+      const newScore = await scoreService.addPoint();
+      
+      const canEdit = await networkService.canEditTable();
+      if (canEdit) {
+        const name = await scoreService.getUserName();
+        let userId = await AsyncStorage.getItem('pte_flow_user_id');
+        if (!userId) {
+          userId = Math.random().toString(36).substring(7);
+          await AsyncStorage.setItem('pte_flow_user_id', userId);
+        }
+        
+        if (name) {
+          try {
+            await fetch(`${Config.API_BASE_URL}/api/leads/update`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, name, score: newScore })
+            });
+          } catch (e) {
+            console.error("Sync failed", e);
+          }
+        }
+      }
+    }
+  };
 
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -698,10 +781,12 @@ export default function ModuleScreen() {
               setResult(res);
               setAsqResultPopup(true);
               setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
+              awardPointIfFirstAttempt(pts === 1);
               return; 
           }
 
           setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
+          awardPointIfFirstAttempt(pts === 1);
           setResult(res);
           setMode('RESULT');
         } catch (e) { 
@@ -772,6 +857,7 @@ export default function ModuleScreen() {
       setMode('RESULT');
     }
     setScoredQuestions(prev => ({...prev, [currentIndex]: ptsForSession}));
+    awardPointIfFirstAttempt(ptsForSession === 1);
 
   } catch (e) {
     console.error("Retry Error:", e);
@@ -825,7 +911,9 @@ export default function ModuleScreen() {
       const q = questions[currentIndex];
       const res = await analyzeWriting(userSummary, isSummarizeWritten ? q.text : q.transcript, isSummarizeWritten ? "Summarize Written" : "Summarize Spoken");
       setResult(res);
-      setScoredQuestions(prev => ({...prev, [currentIndex]: res.overall > 50 ? 1 : 0}));
+      const isCorrect = res.overall > 50;
+      setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
+      awardPointIfFirstAttempt(isCorrect);
       setMode('RESULT');
     } catch (error) { Alert.alert("Error", "AI Scoring failed."); setMode('IDLE'); }
   };
@@ -840,7 +928,9 @@ export default function ModuleScreen() {
       const q = questions[currentIndex];
       const res = await analyzeWriting(userSummary, q.topic, "Essay");
       setResult(res);
-      setScoredQuestions(prev => ({...prev, [currentIndex]: res.overall > 50 ? 1 : 0}));
+      const isCorrect = res.overall > 50;
+      setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
+      awardPointIfFirstAttempt(isCorrect);
       setMode('RESULT');
     } catch (error) {
       Alert.alert("Error", "AI Scoring failed.");
@@ -872,12 +962,14 @@ export default function ModuleScreen() {
     
     const finalScore = Math.max(0, s); 
     const maxScore = correct.length;
+    const isCorrect = finalScore === maxScore;
     
     setScoredQuestions(prev => ({
         ...prev, 
         [currentIndex]: maxScore > 0 ? (finalScore / maxScore) : 0
     })); 
     
+    awardPointIfFirstAttempt(isCorrect);
     setMcResult({score: finalScore, max: maxScore, breakdown:[]}); 
     setMode('RESULT'); 
   };
@@ -915,7 +1007,21 @@ export default function ModuleScreen() {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");
       return;
     }
-    const q = questions[currentIndex]; const dw = q.displayText.split(/\s+/); const sw = q.spokenText.split(/\s+/); const errs: number[] = []; dw.forEach((w: string, i: number) => { if(w.replace(/\W/g,'').toLowerCase() !== sw[i]?.replace(/\W/g,'').toLowerCase()) errs.push(i); }); let s = 0; selectedIndices.forEach(i => { if(errs.includes(i)) s++; else s--; }); const fs = Math.max(0, s); setScoredQuestions(prev => ({...prev, [currentIndex]: fs/Math.max(1, errs.length)})); setHighlightResult({ score: fs, max: errs.length, correctIndices: errs }); setMode('RESULT'); 
+    const q = questions[currentIndex]; 
+    const dw = q.displayText.split(/\s+/); 
+    const sw = q.spokenText.split(/\s+/); 
+    const errs: number[] = []; 
+    dw.forEach((w: string, i: number) => { 
+      if(w.replace(/\W/g,'').toLowerCase() !== sw[i]?.replace(/\W/g,'').toLowerCase()) errs.push(i); 
+    }); 
+    let s = 0; 
+    selectedIndices.forEach(i => { if(errs.includes(i)) s++; else s--; }); 
+    const fs = Math.max(0, s); 
+    const isCorrect = fs === errs.length;
+    setScoredQuestions(prev => ({...prev, [currentIndex]: fs/Math.max(1, errs.length)})); 
+    awardPointIfFirstAttempt(isCorrect);
+    setHighlightResult({ score: fs, max: errs.length, correctIndices: errs }); 
+    setMode('RESULT'); 
   };
   const handlePlayDictation = () => {
     if (dictationPlayed) return; // Prevent playing multiple times if that's your rule
@@ -939,7 +1045,22 @@ export default function ModuleScreen() {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");
       return;
     }
-    const ot = questions[currentIndex].text; const cl = (s:string) => s.toLowerCase().replace(/\W/g,'').split(/\s+/); const ow = cl(ot); const uw = cl(userSummary); let c = 0; const uwc = [...uw]; ow.forEach(w => { const i = uwc.indexOf(w); if(i>-1) { c++; uwc.splice(i, 1); } }); const fs = Math.min(c, ow.length); setScoredQuestions(prev => ({...prev, [currentIndex]: fs/ow.length})); setDictationResult({ score: fs, max: ow.length, original: ot, user: userSummary }); setMode('RESULT'); 
+    const ot = questions[currentIndex].text; 
+    const cl = (s:string) => s.toLowerCase().replace(/\W/g,'').split(/\s+/); 
+    const ow = cl(ot); 
+    const uw = cl(userSummary); 
+    let c = 0; 
+    const uwc = [...uw]; 
+    ow.forEach(w => { 
+      const i = uwc.indexOf(w); 
+      if(i>-1) { c++; uwc.splice(i, 1); } 
+    }); 
+    const fs = Math.min(c, ow.length); 
+    const isCorrect = fs === ow.length;
+    setScoredQuestions(prev => ({...prev, [currentIndex]: fs/ow.length})); 
+    awardPointIfFirstAttempt(isCorrect);
+    setDictationResult({ score: fs, max: ow.length, original: ot, user: userSummary }); 
+    setMode('RESULT'); 
   };
   
   function handlePlayAudio() { 
@@ -966,7 +1087,12 @@ export default function ModuleScreen() {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");
       return;
     }
-    const c = questions[currentIndex].correctAnswers; let s = 0; blankAnswers.forEach((a, i) => { if(a === c[i]) s++; }); setScoredQuestions(prev => ({...prev, [currentIndex]: s/c.length})); setFillBlankScore({ score: s, max: c.length }); setMode('RESULT'); 
+    const c = questions[currentIndex].correctAnswers; let s = 0; blankAnswers.forEach((a, i) => { if(a === c[i]) s++; }); 
+    const isCorrect = s === c.length;
+    setScoredQuestions(prev => ({...prev, [currentIndex]: s/c.length})); 
+    awardPointIfFirstAttempt(isCorrect);
+    setFillBlankScore({ score: s, max: c.length }); 
+    setMode('RESULT'); 
   };
   const addToAnswer = (t: string) => { if(reOrderScore) return; setJumbledList(p => p.filter(x => x!==t)); setUserOrder(p => [...p, t]); };
   const returnToJumbled = (t: string) => { if(reOrderScore) return; setUserOrder(p => p.filter(x => x!==t)); setJumbledList(p => [...p, t]); };
@@ -993,7 +1119,9 @@ export default function ModuleScreen() {
     }
   }
 
+  const isCorrect = s === Math.max(0, max);
   setReOrderScore({ score: s, max: Math.max(0, max) });
+  awardPointIfFirstAttempt(isCorrect);
   setMode('RESULT');
   console.log("Mode set to RESULT with score:", s);
 };
@@ -1593,7 +1721,50 @@ export default function ModuleScreen() {
     </View>
   );
 
-  if (!moduleInfo) return <View><Text>Module not found</Text></View>;
+  if (!moduleInfo && !CATEGORIES[id as string]) return <View><Text>Module not found</Text></View>;
+
+  if (CATEGORIES[id as string]) {
+    const category = CATEGORIES[id as string];
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <MaterialCommunityIcons name="arrow-left" size={28} color="#334155" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{category.title}</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 20 }}>Select a Task Type:</Text>
+          {category.tasks.map((task) => (
+            <TouchableOpacity 
+              key={task.id} 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                backgroundColor: '#fff', 
+                padding: 16, 
+                borderRadius: 16, 
+                marginBottom: 12,
+                shadowColor: '#000',
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                elevation: 2
+              }}
+              onPress={() => router.push(`/module/${task.id}`)}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                <MaterialCommunityIcons name={task.icon as any} size={24} color="#2563EB" />
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#1E293B' }}>{task.title}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#94A3B8" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (questions.length === 0) return <View style={styles.centerContainer}><Text>Coming Soon</Text></View>;
 
   return (

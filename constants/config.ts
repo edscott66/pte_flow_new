@@ -10,9 +10,14 @@ const AIS_APP_URL = "https://ais-dev-p7pekcpklsxlfphmw34a56-565384667751.europe-
 
 // On web (AIS Preview), use relative paths to avoid CORS and cookie check issues.
 // On native (Expo Go), use the full URL.
+// IMPORTANT: If testing locally with Expo Go, set EXPO_PUBLIC_API_URL to your local IP (e.g., http://192.168.0.150:3000)
 export const API_BASE_URL = Platform.OS === 'web' 
   ? '' 
   : (process.env.EXPO_PUBLIC_API_URL || AIS_APP_URL);
+
+export const Config = {
+  API_BASE_URL
+};
 
 if (!API_BASE_URL) {
   console.warn("API_BASE_URL is not defined. API calls will likely fail.");
