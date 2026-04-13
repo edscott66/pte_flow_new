@@ -31,6 +31,8 @@ import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '../../constants/highlightCo
 import { ESSAY_QUESTIONS } from '../../constants/essayData';
 import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
 import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
+import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { analyzeSpeech, analyzeWriting } from '../../services/geminiService';
 import { scoreService } from '../../services/scoreService';
 import { networkService } from '../../services/networkService';
@@ -91,17 +93,31 @@ export default function ModuleScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [bestScores, setBestScores] = useState<{[key: number]: number}>({});
+  const [scoreFeedback, setScoreFeedback] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
+
+  const showFeedback = (message: string, type: 'success' | 'info' | 'error') => {
+    setScoreFeedback({ message, type });
+    setTimeout(() => setScoreFeedback(null), 3000);
+  };
 
   const awardPointIfFirstAttempt = async (isCorrect: boolean) => {
-    if (!isCorrect) return;
+    if (!isCorrect) {
+      console.log("[Score] Question incorrect, no point awarded.");
+      showFeedback("Incorrect. No points awarded.", "error");
+      return;
+    }
     
     const q = questions[currentIndex];
-    const questionId = `${id}_${currentIndex}_${(q.text || q.topic || q.displayText || '').substring(0, 10)}`;
+    const questionId = q.id || `${id}_${currentIndex}_${(q.text || q.topic || q.displayText || '').substring(0, 10)}`;
     
+    console.log(`[Score] Checking attempt for questionId: ${questionId}`);
     const isFirst = await scoreService.isFirstAttempt(questionId);
     if (isFirst) {
       await scoreService.markAsAttempted(questionId);
       const newScore = await scoreService.addPoint();
+      const attempted = await scoreService.getAttemptedQuestions();
+      console.log(`[Score] First correct attempt! New score: ${newScore}`);
+      showFeedback("+1 Point Awarded! Well done.", "success");
       
       const canEdit = await networkService.canEditTable();
       if (canEdit) {
@@ -114,16 +130,24 @@ export default function ModuleScreen() {
         
         if (name) {
           try {
-            await fetch(`${Config.API_BASE_URL}/api/leads/update`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, name, score: newScore })
-            });
+            await ensureAuth();
+            const userDocRef = doc(db, 'leaderboard', userId);
+            await setDoc(userDocRef, {
+              userId,
+              name,
+              score: newScore,
+              attemptedQuestions: attempted,
+              lastUpdate: new Date().toISOString()
+            }, { merge: true });
+            console.log("[Firebase] Score and attempted questions updated successfully in cloud");
           } catch (e) {
-            console.error("Sync failed", e);
+            console.error("Firebase sync failed", e);
           }
         }
       }
+    } else {
+      console.log("[Score] Question already attempted, no additional point awarded.");
+      showFeedback("Correct! (Already awarded point previously)", "info");
     }
   };
 
@@ -2399,6 +2423,28 @@ export default function ModuleScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Score Feedback Popup - Now at the end to ensure it's on top of other modals */}
+      <Modal
+        visible={!!scoreFeedback}
+        transparent={true}
+        animationType="fade"
+        pointerEvents="none"
+      >
+        <View style={styles.feedbackOverlay} pointerEvents="none">
+          <View style={[
+            styles.feedbackPopup, 
+            { backgroundColor: scoreFeedback?.type === 'success' ? '#10B981' : scoreFeedback?.type === 'error' ? '#EF4444' : '#3B82F6' }
+          ]}>
+            <MaterialCommunityIcons 
+              name={scoreFeedback?.type === 'success' ? 'check-circle' : scoreFeedback?.type === 'error' ? 'alert-circle' : 'information'} 
+              size={20} 
+              color="#fff" 
+            />
+            <Text style={styles.feedbackText}>{scoreFeedback?.message}</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2656,6 +2702,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#BAE6FD',
+  },
+  feedbackOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 100,
+  },
+  feedbackPopup: {
+    width: '90%',
+    padding: 15,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+    gap: 10,
+  },
+  feedbackText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   dropdownModalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '90%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
   dropdownTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 16, textAlign: 'center' },

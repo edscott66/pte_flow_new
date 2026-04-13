@@ -3,7 +3,7 @@ export const REPEAT_SENTENCE_QUESTIONS = [
   { id: '2', text: "Please submit your assignment by Friday.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/2.mp3'},
   { id: '3', text: "The library closes early on weekends.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/3.mp3'},
   { id: '4', text: "Attendance is required for all tutorials.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/4.mp3'},
-  { id: '5', text: "The results will be announced tomorrow.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/5.mp3'},
+  { id: '5', text: "Key results will be announced tomorrow.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/5.mp3'},
   { id: '6', text: "Coffee is available in the student lounge.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/6.mp3'},
   { id: '7', text: "The timetable has been updated online.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/7.mp3'},
   { id: '8', text: "Your password needs to be changed regularly.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/8.mp3'},

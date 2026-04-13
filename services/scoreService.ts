@@ -4,6 +4,7 @@ const ATTEMPTED_QUESTIONS_KEY = 'pte_flow_attempted_questions';
 const TOTAL_SCORE_KEY = 'pte_flow_total_score';
 const USER_NAME_KEY = 'pte_flow_user_name';
 const ORIGINAL_SSID_KEY = 'pte_flow_original_ssid';
+const IS_CREATOR_KEY = 'pte_flow_is_creator';
 
 export const scoreService = {
   async isFirstAttempt(questionId: string): Promise<boolean> {
@@ -26,6 +27,10 @@ export const scoreService = {
     return data ? JSON.parse(data) : [];
   },
 
+  async setAttemptedQuestions(questions: string[]) {
+    await AsyncStorage.setItem(ATTEMPTED_QUESTIONS_KEY, JSON.stringify(questions));
+  },
+
   async addPoint() {
     const currentScore = await this.getScore();
     const newScore = currentScore + 1;
@@ -36,6 +41,10 @@ export const scoreService = {
   async getScore(): Promise<number> {
     const data = await AsyncStorage.getItem(TOTAL_SCORE_KEY);
     return data ? parseInt(data, 10) : 0;
+  },
+
+  async setScore(score: number) {
+    await AsyncStorage.setItem(TOTAL_SCORE_KEY, score.toString());
   },
 
   async setUserName(name: string) {
@@ -52,5 +61,26 @@ export const scoreService = {
 
   async getOriginalSSID(): Promise<string | null> {
     return await AsyncStorage.getItem(ORIGINAL_SSID_KEY);
+  },
+
+  async setIsCreator(isCreator: boolean) {
+    await AsyncStorage.setItem(IS_CREATOR_KEY, isCreator ? 'true' : 'false');
+  },
+
+  async getIsCreator(): Promise<boolean> {
+    const data = await AsyncStorage.getItem(IS_CREATOR_KEY);
+    return data === 'true';
+  },
+
+  async clearAllLocalData() {
+    const keys = [
+      ATTEMPTED_QUESTIONS_KEY,
+      TOTAL_SCORE_KEY,
+      USER_NAME_KEY,
+      ORIGINAL_SSID_KEY,
+      IS_CREATOR_KEY,
+      'pte_flow_user_id'
+    ];
+    await AsyncStorage.multiRemove(keys);
   }
 };

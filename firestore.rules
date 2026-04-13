@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: leaderboard
+    // Document ID: {userId}
+    // Fields:
+    //   - userId: string (required) - Unique ID for the user
+    //   - name: string (required, 2-50 chars) - Display name
+    //   - score: number (required, >= 0) - Total score
+    //   - lastUpdate: string (required, ISO8601) - Timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll(['userId', 'name', 'score', 'lastUpdate']) &&
+             data.keys().hasOnly(['userId', 'name', 'score', 'lastUpdate', 'attemptedQuestions']) &&
+             data.userId is string &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 50 &&
+             data.score is number && data.score >= 0 &&
+             data.lastUpdate is string &&
+             (!('attemptedQuestions' in data) || data.attemptedQuestions is list);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /leaderboard/{userId} {
+      // Allow anyone to read the leaderboard (publicly accessible)
+      // Note: In a production app with PII, we would restrict this.
+      // Here, it only contains names and scores.
+      allow read: if true;
+      
+      // Allow creation and updates if the data is valid
+      allow create: if isValidLeaderboardEntry(request.resource.data);
+      allow update: if isValidLeaderboardEntry(request.resource.data);
+      
+      // Allow deletion for resetting the group
+      allow delete: if isAuthenticated();
+    }
+
+    match /config/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}

@@ -22,28 +22,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Enable CORS and JSON parsing at the VERY TOP
-  app.use(cors());
-  app.use(express.json());
-
-  // Ultra-Aggressive Request Logger (at the VERY TOP)
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const isApi = req.path.startsWith('/api');
-    console.log(`>>> [SERVER LOG] ${req.method} ${req.path} (isApi: ${isApi})`);
-    next();
-  });
-
-  // ABSOLUTE TOP PRIORITY API ROUTES
-  app.get("/api/leads", (req, res) => {
-    console.log(`[TOP API] GET /api/leads - returning ${Object.keys(leaderboard).length} leads`);
-    const sortedLeads = Object.values(leaderboard).sort((a, b) => b.score - a.score);
-    res.json(sortedLeads);
-  });
-
-  console.log(`>>> [SERVER START] CWD: ${process.cwd()}`);
-  console.log(`>>> [SERVER START] __dirname: ${__dirname}`);
-
-  // In-memory leaderboard with file persistence (DEFINE AT TOP)
+  // 1. In-memory leaderboard with file persistence (DEFINE AT THE VERY TOP)
   const LEADS_FILE = path.join(process.cwd(), "leaderboard.json");
   let leaderboard: Record<string, { name: string, score: number, lastUpdate: string }> = {};
 
@@ -71,46 +50,20 @@ async function startServer() {
     console.error("[Leaderboard] Failed to load from file:", err);
   }
 
-  // Manual API Route Handling (Safety Net)
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    // Use req.path for more reliable matching
-    const p = req.path;
-    const m = req.method;
-    
-    // Handle both /api/leads and /api/v1/leads for compatibility
-    if (p === '/api/leads' || p === '/api/leads/' || p === '/api/v1/leads') {
-      if (m === 'GET') {
-        console.log(`[MANUAL API] GET ${p} - returning ${Object.keys(leaderboard).length} leads`);
-        const sortedLeads = Object.values(leaderboard).sort((a, b) => b.score - a.score);
-        return res.json(sortedLeads);
-      }
-    }
-    
-    if (p === '/api/leads/update' || p === '/api/leads/update/' || p === '/api/v1/leads/update') {
-      if (m === 'POST') {
-        console.log(`[MANUAL API] POST ${p} - Body: ${JSON.stringify(req.body)}`);
-        const { userId, name, score } = req.body;
-        if (userId && name) {
-          leaderboard[userId] = {
-            name,
-            score: score || 0,
-            lastUpdate: new Date().toISOString()
-          };
-          saveLeaderboard();
-          return res.json({ success: true, leaderboard: Object.values(leaderboard) });
-        }
-      }
-    }
-    next();
-  });
+  // 2. Middleware
+  app.use(cors());
+  app.use(express.json());
 
-  // Standard API routes for Leads
+  // 3. ABSOLUTE TOP PRIORITY API ROUTES
+  // We define these directly on 'app' to ensure they are hit before ANY other middleware
   app.get("/api/leads", (req, res) => {
+    console.log(`[API GET] /api/leads - returning ${Object.keys(leaderboard).length} leads`);
     const sortedLeads = Object.values(leaderboard).sort((a, b) => b.score - a.score);
     res.json(sortedLeads);
   });
 
   app.post("/api/leads/update", (req, res) => {
+    console.log(`[API POST] /api/leads/update - Body: ${JSON.stringify(req.body)}`);
     const { userId, name, score } = req.body;
     if (!userId || !name) return res.status(400).json({ error: "Missing userId or name" });
     
@@ -123,103 +76,49 @@ async function startServer() {
     res.json({ success: true, leaderboard: Object.values(leaderboard) });
   });
 
-  // Fallback route without /api prefix
-  app.post("/leads/update", (req, res) => {
-    console.log("[API] POST /leads/update hit (fallback)");
-    const { userId, name, score } = req.body;
-    if (!userId || !name) return res.status(400).json({ error: "Missing userId or name" });
-    
-    leaderboard[userId] = {
-      name,
-      score: score || 0,
-      lastUpdate: new Date().toISOString()
-    };
-    saveLeaderboard();
-    res.json({ success: true, leaderboard: Object.values(leaderboard) });
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", entries: Object.keys(leaderboard).length });
   });
 
-  // API Proxy for OpenAI
-  app.post("/api/ai/chat", async (req: Request, res: Response) => {
-    console.log("[API] AI Chat request");
+  // 4. Ultra-Aggressive Request Logger (for debugging)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const isApi = req.path.startsWith('/api') || req.url.startsWith('/api');
+    console.log(`>>> [SERVER LOG] ${req.method} ${req.path} (isApi: ${isApi})`);
+    if (isApi) {
+      // If it's an API call but reached here, it means it missed the routes above
+      console.warn(`[API MISS] ${req.method} ${req.path} - Returning JSON 404`);
+      return res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+    }
+    next();
+  });
+
+  // 5. OTHER API ROUTES (Proxies)
+  const apiRouter = express.Router();
+
+  apiRouter.post("/ai/gemini", async (req: Request, res: Response) => {
+    console.log("[API] Gemini Proxy request");
     try {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: "OpenAI API Key not configured" });
-      }
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY not configured on server" });
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${req.body.model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(req.body),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body.payload),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`OpenAI API Error (${response.status}):`, errorText);
-        return res.status(response.status).json({ error: "OpenAI API error", details: errorText });
-      }
 
       const data = await response.json();
       res.status(response.status).json(data);
     } catch (error) {
-      console.error("OpenAI Proxy Error:", error);
-      res.status(500).json({ error: "Failed to connect to OpenAI", details: error instanceof Error ? error.message : String(error) });
+      console.error("Gemini Proxy Error:", error);
+      res.status(500).json({ error: "Failed to connect to Gemini" });
     }
   });
 
-  // API Proxy for SpeechAce
-  app.post("/api/ai/speechace", upload.single("user_audio_file"), async (req: MulterRequest, res: Response) => {
-    console.log("[API] SpeechAce request");
-    try {
-      const apiKey = process.env.SPEECHACE_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: "SpeechAce API Key not configured" });
-      }
+  // Mount the router at /api
+  app.use("/api", apiRouter);
 
-      const multerFile = req.file;
-      if (!multerFile) {
-        return res.status(400).json({ error: "No audio file provided" });
-      }
-
-      // Handle potentially pre-encoded API keys from .env
-      const rawKey = apiKey.includes('%') ? decodeURIComponent(apiKey) : apiKey;
-
-      const formData = new FormData();
-      const fileBlob = new Blob([(multerFile as any).buffer], { type: multerFile.mimetype });
-      formData.append("user_audio_file", fileBlob as any, multerFile.originalname);
-      
-      formData.append("text", req.body.text || "");
-      formData.append("user_id", req.body.user_id || "student_123");
-
-      const response = await fetch(`https://api2.speechace.com/api/scoring/text/v0.5/json?key=${encodeURIComponent(rawKey)}&dialect=en-us&include_fluency=1&include_pronunciation=1`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`SpeechAce API Error (${response.status}):`, errorText);
-        return res.status(response.status).json({ error: "SpeechAce API error", details: errorText });
-      }
-
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error) {
-      console.error("SpeechAce Proxy Error:", error);
-      res.status(500).json({ error: "Failed to connect to SpeechAce", details: error instanceof Error ? error.message : String(error) });
-    }
-  });
-
-  // Catch-all for /api to prevent fall-through to Vite
-  app.use("/api", (req, res) => {
-    console.warn(`[API] 404 Not Found: ${req.method} ${req.url}`);
-    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
-  });
-
-  // Vite middleware for development
+  // 5. Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -230,13 +129,21 @@ async function startServer() {
     app.use((req, res, next) => {
       const isApi = req.url.startsWith('/api') || req.path.startsWith('/api');
       if (isApi) {
-        return next();
+        // If it's an API call but reached here, it means it missed the routes above
+        console.warn(`[API MISS] ${req.method} ${req.path} - Returning JSON 404`);
+        return res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
       }
       vite.middlewares(req, res, next);
     });
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
+    
+    // API 404 handler for production
+    app.use("/api", (req, res) => {
+      res.status(404).json({ error: "API route not found" });
+    });
+
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

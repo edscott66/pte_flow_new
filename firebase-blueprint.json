@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "A single entry in the global leaderboard",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique ID for the user" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "score": { "type": "number", "description": "Total score of the user" },
+        "lastUpdate": { "type": "string", "format": "date-time", "description": "ISO timestamp of last update" },
+        "attemptedQuestions": { "type": "array", "items": { "type": "string" }, "description": "List of IDs for questions already scored" }
+      },
+      "required": ["userId", "name", "score", "lastUpdate"]
+    }
+  },
+  "firestore": {
+    "/leaderboard/{userId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Collection of leaderboard entries keyed by userId"
+    }
+  }
+}

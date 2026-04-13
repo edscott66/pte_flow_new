@@ -1,5 +1,4 @@
-import 'react-native-get-random-values';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,11 +7,12 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { scoreService } from '../../services/scoreService';
 import { networkService } from '../../services/networkService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Config } from '../../constants/config';
+import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { Image } from 'react-native';
-import io, { Socket } from 'socket.io-client';
 
 interface Lead {
+  userId?: string;
   name: string;
   score: number;
   lastUpdate: string;
@@ -30,38 +30,38 @@ export default function Leaderboard() {
   const [canEdit, setCanEdit] = useState(true);
   const [currentSSID, setCurrentSSID] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
-  
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    fetchLeads();
     checkNetwork();
     scoreService.getUserName().then(name => setUserName(name || 'Student'));
 
-    // Initialize Socket.io
-    const socket = io(Config.API_BASE_URL);
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      console.log('[Socket] Connected to server');
+    // Real-time Firebase listener
+    setLoading(true);
+    const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(50));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const rawData = snapshot.docs.map(doc => ({
+        userId: doc.id,
+        ...doc.data()
+      })) as Lead[];
+      
+      // Deduplicate by name, keeping highest score
+      const uniqueLeads: Record<string, Lead> = {};
+      rawData.forEach(lead => {
+        if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
+          uniqueLeads[lead.name] = lead;
+        }
+      });
+      
+      const sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
+      setLeads(sortedLeads);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+      setLoading(false);
     });
 
-    socket.on('leaderboard:updated', (updatedLeads: Lead[]) => {
-      console.log('[Socket] Leaderboard updated via socket');
-      setLeads(updatedLeads);
-    });
-
-    socket.on('connect_error', (err) => {
-      console.warn('[Socket] Connection error:', err.message);
-    });
-
-    // Polling fallback every 10 seconds
-    const interval = setInterval(fetchLeads, 10000);
-
-    return () => {
-      socket.disconnect();
-      clearInterval(interval);
-    };
+    return () => unsubscribe();
   }, []);
 
   const checkNetwork = async () => {
@@ -71,44 +71,10 @@ export default function Leaderboard() {
     setCanEdit(editable);
   };
 
-  const fetchLeads = async () => {
-    setLoading(true);
-    try {
-      // Add timestamp to prevent caching
-      const url = `${Config.API_BASE_URL}/api/leads?t=${Date.now()}`;
-      console.log(`[Leaderboard] Fetching from: ${url}`);
-      
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
-      }
-      
-      const contentType = response.headers.get("content-type");
-      console.log(`[Leaderboard] Content-Type: ${contentType}`);
-      
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        const data = await response.json();
-        console.log(`[Leaderboard] Received ${data.length} leads`);
-        setLeads(data);
-      } else {
-        const text = await response.text();
-        console.error("Expected JSON but got:", text.substring(0, 100));
-        if (text.trim().startsWith('<')) {
-          console.warn("Received HTML. This usually means the API route was not found and Vite served the SPA fallback.");
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch leads:", error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchLeads = async (showLoading = true) => {
+    // No longer needed with onSnapshot, but keeping for compatibility if called
+    if (showLoading) setLoading(true);
+    setLoading(false);
   };
 
   const handleScanPress = async () => {
@@ -152,24 +118,23 @@ export default function Leaderboard() {
     }
 
     try {
+      await ensureAuth();
       const userId = `manual_${Math.random().toString(36).substring(7)}`;
-      const response = await fetch(`${Config.API_BASE_URL}/api/leads/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, name: manualName, score: scoreNum })
+      const userDocRef = doc(db, 'leaderboard', userId);
+      
+      await setDoc(userDocRef, {
+        userId,
+        name: manualName,
+        score: scoreNum,
+        lastUpdate: new Date().toISOString()
       });
 
-      if (response.ok) {
-        Alert.alert("Success", `${manualName} added to the leaderboard.`);
-        setShowManualEntry(false);
-        setManualName('');
-        setManualScore('');
-        fetchLeads();
-      } else {
-        throw new Error("Failed to update leaderboard");
-      }
+      Alert.alert("Success", `${manualName} added to the leaderboard.`);
+      setShowManualEntry(false);
+      setManualName('');
+      setManualScore('');
     } catch (error) {
-      console.error("Manual entry error:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'leaderboard/manual');
       Alert.alert("Error", "Could not add user to leaderboard.");
     }
   };
@@ -193,7 +158,13 @@ export default function Leaderboard() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Global Leaderboard</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Global Leaderboard</Text>
+          <View style={styles.userBadge}>
+            <MaterialCommunityIcons name="account-circle" size={16} color="#2563EB" />
+            <Text style={styles.userNameText}>{userName}</Text>
+          </View>
+        </View>
         <Text style={styles.subtitle}>First Attempt Scores Only</Text>
         
         {!canEdit && (
@@ -215,7 +186,7 @@ export default function Leaderboard() {
           <Text style={styles.actionText}>Scan to Join</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={fetchLeads}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => fetchLeads()}>
           <MaterialCommunityIcons name="refresh" size={24} color="#2563EB" />
           <Text style={styles.actionText}>Refresh</Text>
         </TouchableOpacity>
@@ -232,7 +203,7 @@ export default function Leaderboard() {
         <FlatList
           data={leads}
           renderItem={renderLead}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => item.userId || item.name}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <Text style={styles.emptyText}>No students on the leaderboard yet.</Text>
@@ -325,6 +296,9 @@ export default function Leaderboard() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  userBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
+  userNameText: { fontSize: 14, fontWeight: 'bold', color: '#2563EB' },
   title: { fontSize: 24, fontWeight: 'bold', color: '#1E293B' },
   subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
   readOnlyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, alignSelf: 'flex-start' },
