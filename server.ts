@@ -28,8 +28,16 @@ async function startServer() {
 
   // Ultra-Aggressive Request Logger (at the VERY TOP)
   app.use((req: Request, res: Response, next: NextFunction) => {
-    console.log(`>>> [SERVER LOG] ${req.method} ${req.originalUrl || req.url} (Path: ${req.path})`);
+    const isApi = req.path.startsWith('/api');
+    console.log(`>>> [SERVER LOG] ${req.method} ${req.path} (isApi: ${isApi})`);
     next();
+  });
+
+  // ABSOLUTE TOP PRIORITY API ROUTES
+  app.get("/api/leads", (req, res) => {
+    console.log(`[TOP API] GET /api/leads - returning ${Object.keys(leaderboard).length} leads`);
+    const sortedLeads = Object.values(leaderboard).sort((a, b) => b.score - a.score);
+    res.json(sortedLeads);
   });
 
   console.log(`>>> [SERVER START] CWD: ${process.cwd()}`);

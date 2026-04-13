@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
+import 'react-native-get-random-values';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 // import QRCode from 'react-native-qrcode-svg';
@@ -9,6 +10,7 @@ import { networkService } from '../../services/networkService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Config } from '../../constants/config';
 import { Image } from 'react-native';
+import io, { Socket } from 'socket.io-client';
 
 interface Lead {
   name: string;
@@ -21,15 +23,45 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualScore, setManualScore] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
   const [canEdit, setCanEdit] = useState(true);
   const [currentSSID, setCurrentSSID] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
+  
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     fetchLeads();
     checkNetwork();
     scoreService.getUserName().then(name => setUserName(name || 'Student'));
+
+    // Initialize Socket.io
+    const socket = io(Config.API_BASE_URL);
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Socket] Connected to server');
+    });
+
+    socket.on('leaderboard:updated', (updatedLeads: Lead[]) => {
+      console.log('[Socket] Leaderboard updated via socket');
+      setLeads(updatedLeads);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[Socket] Connection error:', err.message);
+    });
+
+    // Polling fallback every 10 seconds
+    const interval = setInterval(fetchLeads, 10000);
+
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
   }, []);
 
   const checkNetwork = async () => {
@@ -107,6 +139,41 @@ export default function Leaderboard() {
     }
   };
 
+  const handleManualSubmit = async () => {
+    if (!manualName.trim() || !manualScore.trim()) {
+      Alert.alert("Error", "Please enter both name and score.");
+      return;
+    }
+
+    const scoreNum = parseInt(manualScore);
+    if (isNaN(scoreNum)) {
+      Alert.alert("Error", "Score must be a number.");
+      return;
+    }
+
+    try {
+      const userId = `manual_${Math.random().toString(36).substring(7)}`;
+      const response = await fetch(`${Config.API_BASE_URL}/api/leads/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, name: manualName, score: scoreNum })
+      });
+
+      if (response.ok) {
+        Alert.alert("Success", `${manualName} added to the leaderboard.`);
+        setShowManualEntry(false);
+        setManualName('');
+        setManualScore('');
+        fetchLeads();
+      } else {
+        throw new Error("Failed to update leaderboard");
+      }
+    } catch (error) {
+      console.error("Manual entry error:", error);
+      Alert.alert("Error", "Could not add user to leaderboard.");
+    }
+  };
+
   const renderLead = ({ item, index }: { item: Lead, index: number }) => (
     <View style={styles.leadRow}>
       <View style={styles.rankContainer}>
@@ -152,6 +219,11 @@ export default function Leaderboard() {
           <MaterialCommunityIcons name="refresh" size={24} color="#2563EB" />
           <Text style={styles.actionText}>Refresh</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowManualEntry(true)}>
+          <MaterialCommunityIcons name="account-plus" size={24} color="#2563EB" />
+          <Text style={styles.actionText}>Add User</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -167,6 +239,46 @@ export default function Leaderboard() {
           }
         />
       )}
+
+      {/* Manual Entry Modal */}
+      <Modal visible={showManualEntry} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Manual Entry</Text>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="User Name"
+              value={manualName}
+              onChangeText={setManualName}
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Score (0-90)"
+              value={manualScore}
+              onChangeText={setManualScore}
+              keyboardType="numeric"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#E2E8F0' }]} 
+                onPress={() => setShowManualEntry(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: '#1E293B' }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#2563EB' }]} 
+                onPress={handleManualSubmit}
+              >
+                <Text style={styles.modalButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* QR Modal */}
       <Modal visible={showQR} transparent animationType="fade">
@@ -241,6 +353,32 @@ const styles = StyleSheet.create({
   modalDesc: { textAlign: 'center', color: '#64748B', marginTop: 20, lineHeight: 20 },
   closeButton: { marginTop: 30, backgroundColor: '#2563EB', paddingVertical: 12, paddingHorizontal: 40, borderRadius: 12 },
   closeButtonText: { color: '#fff', fontWeight: 'bold' },
+
+  input: {
+    width: '100%',
+    backgroundColor: '#F1F5F9',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+    fontSize: 16,
+    color: '#1E293B'
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    width: '100%'
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  modalButtonText: {
+    fontWeight: 'bold',
+    color: '#fff'
+  },
 
   scannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
   scannerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
