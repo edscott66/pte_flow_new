@@ -38,9 +38,21 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
     let base64Image = null;
     if (imageUri) {
       try {
-        base64Image = await FileSystem.readAsStringAsync(imageUri, {
-          encoding: 'base64',
-        });
+        if (imageUri.startsWith('http')) {
+          // Remote URL - download first to a temporary file
+          const tempFile = `${FileSystem.cacheDirectory}temp_image_${Date.now()}.png`;
+          await FileSystem.downloadAsync(imageUri, tempFile);
+          base64Image = await FileSystem.readAsStringAsync(tempFile, {
+            encoding: 'base64',
+          });
+          // Clean up the temporary file
+          await FileSystem.deleteAsync(tempFile, { idempotent: true });
+        } else {
+          // Local URI
+          base64Image = await FileSystem.readAsStringAsync(imageUri, {
+            encoding: 'base64',
+          });
+        }
       } catch (e) {
         console.error("Error reading image for analysis:", e);
       }

@@ -210,7 +210,7 @@ export default function WelcomeScreen() {
 
       {/* Content Section */}
       <View style={styles.contentSection}>
-        <Text style={styles.title}>Master the PTE Exam with AI</Text>
+        <Text style={styles.title}>Master the PTE Exam with AI and Big Ben Academy</Text>
         
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Enter your name to join:</Text>

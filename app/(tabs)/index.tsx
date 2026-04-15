@@ -12,7 +12,7 @@ const PRACTICE_MODULES = [
     title: 'Speaking',
     icon: 'mic-outline',
     color: '#2563EB',
-    tasks: ['Read Aloud', 'Repeat Sentence', 'Describe Image'],
+    tasks: ['Read Aloud', 'Repeat Sentence', 'Describe Image', 'Summarize Group Discussion'],
   },
   {
     id: 'writing',

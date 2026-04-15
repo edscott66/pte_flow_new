@@ -49,6 +49,8 @@ const CATEGORIES: Record<string, { title: string, tasks: { id: string, title: st
       { id: 'repeat-sentence', title: 'Repeat Sentence', icon: 'repeat' },
       { id: 'describe-image', title: 'Describe Image', icon: 'image' },
       { id: 'retell-lecture', title: 'Retell Lecture', icon: 'volume-high' },
+      { id: 'summarize-group-discussion', title: 'Summarize Group Discussion', icon: 'account-group' },
+      { id: 'respond-to-situation', title: 'Respond to Situation', icon: 'chat-processing' },
       { id: 'answer-short-question', title: 'Answer Short Question', icon: 'help-circle' },
       { id: 'personal-intro', title: 'Personal Introduction', icon: 'account-voice' },
     ]
@@ -87,6 +89,56 @@ const CATEGORIES: Record<string, { title: string, tasks: { id: string, title: st
 
 type TimerMode = 'IDLE' | 'PLAYING_AUDIO' | 'PREP' | 'PREP_RETELL' | 'PREP_LISTENING' | 'RECORDING' | 'PROCESSING' | 'RESULT' | 'WAITING_NEXT';
 
+const MOCK_EXAM_SECTIONS_INFO = [
+  {
+    id: 'speaking-writing',
+    title: 'Part 1: Speaking & Writing',
+    description: 'This section tests your ability to speak and write in English in an academic environment.',
+    questionCount: 47,
+    breakdown: [
+      { type: 'Personal Introduction (Unscored)', count: 1 },
+      { type: 'Read Aloud', count: 7 },
+      { type: 'Repeat Sentence', count: 12 },
+      { type: 'Describe Image', count: 6 },
+      { type: 'Retell Lecture', count: 3 },
+      { type: 'Answer Short Questions', count: 12 },
+      { type: 'Summarize Group Discussion', count: 1 },
+      { type: 'Respond to a Situation', count: 1 },
+      { type: 'Summarize Written Text', count: 3 },
+      { type: 'Write Essay', count: 1 },
+    ]
+  },
+  {
+    id: 'reading',
+    title: 'Part 2: Reading',
+    description: 'This section tests your ability to read and understand academic English.',
+    questionCount: 59,
+    breakdown: [
+      { type: 'Fill in the Blanks (Dropdown)', count: 25 },
+      { type: 'Multiple Choice, Multiple Answers', count: 3 },
+      { type: 'Re-order Paragraph', count: 4 },
+      { type: 'Fill in the Blanks (Drag & Drop)', count: 24 },
+      { type: 'Multiple Choice, Single Answer', count: 3 },
+    ]
+  },
+  {
+    id: 'listening',
+    title: 'Part 3: Listening',
+    description: 'This section tests your ability to listen to and understand academic English.',
+    questionCount: 25,
+    breakdown: [
+      { type: 'Summarize Spoken Text', count: 2 },
+      { type: 'Multiple Choice, Multiple Answers', count: 2 },
+      { type: 'Fill in the Blanks', count: 3 },
+      { type: 'Highlight Correct Summary', count: 2 },
+      { type: 'Multiple Choice, Single Answer', count: 2 },
+      { type: 'Select Missing Word', count: 2 },
+      { type: 'Highlight Incorrect Words', count: 3 },
+      { type: 'Write From Dictation', count: 9 },
+    ]
+  }
+];
+
 export default function ModuleScreen() {
   // 1. STATE DEFINITIONS (Fixes setQuestions and setLoading errors)
   const [questions, setQuestions] = useState<any[]>([]);
@@ -95,12 +147,23 @@ export default function ModuleScreen() {
   const [bestScores, setBestScores] = useState<{[key: number]: number}>({});
   const [scoreFeedback, setScoreFeedback] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
 
+  // Mock Exam States
+  const [mockExamSections, setMockExamSections] = useState<any[]>([]);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [mockExamFlow, setMockExamFlow] = useState<'MAIN_INTRO' | 'SECTION_INTRO' | 'SECTION_POPUP' | 'IN_PROGRESS' | 'FINAL_RESULTS'>('MAIN_INTRO');
+  const [sectionScores, setSectionScores] = useState<Record<string, number[]>>({});
+
   const showFeedback = (message: string, type: 'success' | 'info' | 'error') => {
     setScoreFeedback({ message, type });
     setTimeout(() => setScoreFeedback(null), 3000);
   };
 
   const awardPointIfFirstAttempt = async (isCorrect: boolean) => {
+    if (id === 'mock-exam') {
+      console.log("[Score] Mock exam attempt, skipping leaderboard update.");
+      return;
+    }
+
     if (!isCorrect) {
       console.log("[Score] Question incorrect, no point awarded.");
       showFeedback("Incorrect. No points awarded.", "error");
@@ -192,7 +255,10 @@ export default function ModuleScreen() {
 
     if (id === 'mock-exam') {
         try {
-            loaded = generateMockExam(); 
+            const sections = generateMockExam(); 
+            setMockExamSections(sections);
+            setMockExamFlow('MAIN_INTRO');
+            setQuestions([]); 
         } catch (e) {
             console.log("Mock Exam Error:", e);
         }
@@ -267,29 +333,29 @@ export default function ModuleScreen() {
   const [resetKey, setResetKey] = useState(0);
 
   const TASK_INSTRUCTIONS: Record<string, string> = {
-    'read-aloud': 'Read the text aloud into the microphone.',
-    'repeat-sentence': 'Listen to the sentence and repeat it exactly.',
-    'describe-image': 'Describe the image in detail.',
-    're-order-paragraphs': 'Drag the sentences into the correct logical order.',
-    'fill-blanks': 'Drag the words into the correct blanks.',
+    'read-aloud': 'Speak the text smoothly at a natural pace with clear pronunciation, correct stress, and steady rhythm while matching the punctuation and meaning of the passage.',
+    'repeat-sentence': 'Repeat the sentence you hear by copying the words, the sound, and the rhythm as closely as you can.',
+    'describe-image': 'Describe the picture by talking about the main things you see, what they are doing, and any clear patterns or trends.',
+    're-order-paragraphs': 'Drag the sentences into the correct logical order by finding the one that starts the idea, then linking the others by meaning, time order, or logical connection.',
+    'fill-blanks': 'Drag the words into the correct blanks that best completes the sentence by matching the meaning, grammar, and overall flow of the text.',
     'summarize-spoken': 'Listen to the audio and summarize it in 50-70 words.',
-    'write-dictation': 'Listen to the sentence and type it exactly.',
-    'highlight-incorrect': 'Click the words that differ from the audio.',
-    'multiple-choice': 'Select all correct answers.',
-    'multiple-choice-r-single': 'Select the single best answer.',
+    'write-dictation': 'Type the sentence exactly as you hear it, matching every word and spelling correctly.',
+    'highlight-incorrect': 'Click the words in the transcript that are different from what you hear in the audio.',
+    'multiple-choice': 'Choose the option that best matches the meaning of the passage by checking which answer fits the ideas in the text. ',
+    'multiple-choice-r-single': 'Choose the one answer that best matches the meaning of the passage by checking which option fits the ideas in the text.',
     'summarize-written': 'Summarize the text in one sentence (5-75 words).',
-    'retell-lecture': 'Listen to the lecture and retell it in your own words.',
-    'answer-short-question': 'Listen to the question and give a short answer.',
-    'fill-blanks-rw': 'Select the correct words for each blank.',
-    'highlight-correct-summary': 'Select the best summary of the audio.',
-    'select-missing-word': 'Select the word that completes the audio.',
-    'essay': 'Write a 200-300 word essay on the given topic.',
+    'retell-lecture': 'Explain the lecture in your own words by telling the main idea and the most important points you remember.',
+    'answer-short-question': 'Give a short, clear answer to the question using only one or two words .',
+    'fill-blanks-rw': 'Choose the word that best completes the sentence by matching the meaning, grammar, and logic of the whole passage.',
+    'highlight-correct-summary': 'Choose the summary that best matches the main idea of the audio by checking which option fits the overall meaning most accurately.',
+    'select-missing-word': 'Pick the word that best completes the sentence by matching the meaning and the grammar of the audio.',
+    'essay': 'Write a 200-300 word well‑organised essay on the given topic, give reasons and examples, and stay focused on one main position.',
     'summarize-group-discussion': 'Summarize the viewpoints in the discussion.',
-    'respond-to-situation': 'Listen to the situation and respond appropriately.',
-    'multiple-choice-l-single': 'Select the single best answer.',
-    'multiple-choice-l-multi': 'Select all correct answers.',
-    'fill-blanks-listening': 'Type the missing words in the blanks.',
-    'personal-intro': 'Introduce yourself. This is not scored.',
+    'respond-to-situation': 'Speak one or two clear sentences that directly answer the situation by giving a natural, appropriate response.',
+    'multiple-choice-l-single': 'Choose the one answer that best matches the meaning of the passage by checking which option fits the ideas most accurately.',
+    'multiple-choice-l-multi': 'Choose all the answers that match the meaning of the audio by selecting every option that is correct.',
+    'fill-blanks-listening': 'Type in the word you hear in the audio that correctly completes the sentence so the meaning and grammar are accurate.',
+    'personal-intro': 'Speak for about 30 seconds to introduce yourself by giving simple information about who you are, what you do, and something about your interests or background.',
     'mock-exam': 'Complete the full PTE mock exam. This includes all sections and is timed.'
   };
   const [asqResultPopup, setAsqResultPopup] = useState(false);
@@ -581,8 +647,35 @@ export default function ModuleScreen() {
   };
 
   const handleNext = () => {
-    if (currentIndex < questions.length - 1) scrollToQuestion(currentIndex + 1);
-    else Alert.alert("Completed", `You scored ${currentSessionScore.toFixed(1)} out of ${questions.length}!`);
+    if (id === 'mock-exam') {
+      // Record score before moving
+      const currentQScore = scoredQuestions[currentIndex] || 0;
+      const sectionId = mockExamSections[currentSectionIndex].id;
+      setSectionScores(prev => ({
+        ...prev,
+        [sectionId]: [...(prev[sectionId] || []), currentQScore]
+      }));
+
+      if (currentIndex < questions.length - 1) {
+        scrollToQuestion(currentIndex + 1);
+      } else {
+        // End of section
+        if (currentSectionIndex < mockExamSections.length - 1) {
+          const nextIdx = currentSectionIndex + 1;
+          setCurrentSectionIndex(nextIdx);
+          setQuestions(mockExamSections[nextIdx].questions);
+          setCurrentIndex(0);
+          setScoredQuestions({}); // Reset for new section
+          setMockExamFlow('SECTION_INTRO');
+        } else {
+          // End of exam
+          setMockExamFlow('FINAL_RESULTS');
+        }
+      }
+    } else {
+      if (currentIndex < questions.length - 1) scrollToQuestion(currentIndex + 1);
+      else Alert.alert("Completed", `You scored ${currentSessionScore.toFixed(1)} out of ${questions.length}!`);
+    }
   };
 
   const handlePrev = () => { if (currentIndex > 0) scrollToQuestion(currentIndex - 1); };
@@ -704,6 +797,14 @@ export default function ModuleScreen() {
         setRecording(null);
       }
 
+      // Show "Speak Now" popup BEFORE starting the recording
+      setShowSpeakNow(true);
+      
+      // Wait for the popup to disappear before starting the actual recording and timer
+      // This ensures the user can see the text/image before the clock starts ticking
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setShowSpeakNow(false);
+
       await Audio.setAudioModeAsync({ 
         allowsRecordingIOS: true, 
         playsInSilentModeIOS: true,
@@ -713,10 +814,6 @@ export default function ModuleScreen() {
       });
       
       setMode('RECORDING');
-      
-      // Show "Speak Now" popup
-      setShowSpeakNow(true);
-      setTimeout(() => setShowSpeakNow(false), 2500);
 
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
@@ -775,6 +872,7 @@ export default function ModuleScreen() {
           if (isRetellLecture) ctx = q.text || q.transcript;
           if (isASQ) ctx = `Question: ${q.text}. Expected Answer: ${q.answer}`;
           if (isRespondSituation) ctx = `Situation: ${q.situation}. Task: ${q.task}`;
+          if (isSummarizeGroup) ctx = `Topic: ${q.topic}. Transcript: ${q.transcript}`;
 
           // --- NEW: BYPASS SCORING FOR PERSONAL INTRO ---
           if (isPersonalIntro) {
@@ -1211,6 +1309,19 @@ export default function ModuleScreen() {
             </Text>
           )}
         </View>
+
+        {/* TASK INSTRUCTIONS (Mock Exam - First of each set) */}
+        {id === 'mock-exam' && questions.findIndex(q => q.type === item.type) === index && mode !== 'RESULT' && (
+          <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <MaterialCommunityIcons name="information" size={18} color="#2563EB" />
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1E293B', marginLeft: 6 }}>INSTRUCTIONS:</Text>
+            </View>
+            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 20 }}>
+              {TASK_INSTRUCTIONS[item.type] || 'Follow the instructions on screen to complete the task.'}
+            </Text>
+          </View>
+        )}
         
         {/* 0. PERSONAL INTRO (Updated with Big Timer) */}
         {((item.type === 'personal-intro' || id === 'personal-intro') && mode !== 'RESULT') && (
@@ -1294,25 +1405,25 @@ export default function ModuleScreen() {
             </View>
           )}
         {isDescribeImage && ( 
-          <View style={[styles.imageContainer, { flex: 1 }]}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.imageContainer, { paddingBottom: 20 }]}>
             {mode !== 'RESULT' && (
               <View style={{backgroundColor: '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 15}}>
                   <Text style={{color:'#475569', fontWeight: 'bold'}}>
                     {mode === 'IDLE' ? 'Ready to Start' : 
                      mode === 'PREP' ? `Prepare to Describe: ${timeLeft}s` :
-                     mode === 'RECORDING' ? 'Recording... Speak Now!' :
+                     mode === 'RECORDING' ? `Recording: ${timeLeft}s` :
                      mode === 'PROCESSING' ? 'Analyzing Speech...' : 'Result'}
                   </Text>
               </View>
             )}
             <TouchableOpacity onPress={() => { if(item.image) { setCurrentZoomImage(item.image); setIsImageViewVisible(true); } }} activeOpacity={0.8} style={{width:'100%', alignItems:'center'}}>
-              {item.image ? ( <Image source={{ uri: item.image }} style={styles.chartImage} resizeMode="contain" /> ) : ( 
+              {item.image ? ( <Image source={{ uri: item.image }} style={[styles.chartImage, { height: 220 }]} resizeMode="contain" /> ) : ( 
                 <View style={styles.missingImage}><MaterialCommunityIcons name="image-off" size={40} color="#ccc" /><Text>Image Missing</Text></View> 
               )}
               {item.image && <View style={styles.zoomIcon}><MaterialCommunityIcons name="magnify-plus-outline" size={24} color="#fff" /></View>}
             </TouchableOpacity>
             <Text style={styles.imageTitle}>{item.title}</Text>
-          </View> 
+          </ScrollView> 
         )}
         {isReOrder && ( 
           <View style={{flex: 1}}>
@@ -1671,8 +1782,11 @@ export default function ModuleScreen() {
                   </View>
                )}
                {isSummarizeGroup && mode !== 'IDLE' && (
-                   <View style={{marginBottom:15}} />
-               )}
+                   <View style={{backgroundColor:'#F0F9FF', padding:15, borderRadius:8, marginBottom:15}}>
+                      <Text style={{color:'#0369A1', fontWeight:'bold', marginBottom:5}}>Topic:</Text>
+                      <Text style={{fontSize:16, lineHeight:22, color:'#1E293B'}}>{item.topic}</Text>
+                   </View>
+                )}
 
                {/* 2. STATUS CARD */}
                {index === currentIndex && (
@@ -1745,7 +1859,189 @@ export default function ModuleScreen() {
     </View>
   );
 
+  const startMockExam = () => {
+    setMockExamFlow('SECTION_INTRO');
+    setCurrentSectionIndex(0);
+    setQuestions(mockExamSections[0].questions);
+    setCurrentIndex(0);
+  };
+
+  const startSection = () => {
+    setTimeLeft(5);
+    setMockExamFlow('SECTION_POPUP');
+    startTimer(5, () => {
+      setMockExamFlow('IN_PROGRESS');
+    });
+  };
+
+  const renderMainIntro = () => (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={28} color="#334155" />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>PTE Academic Mock Test</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Exam Overview</Text>
+        <Text style={{ fontSize: 16, color: '#64748B', marginBottom: 20 }}>Complete all three parts of the PTE Academic exam in one sitting.</Text>
+        
+        {MOCK_EXAM_SECTIONS_INFO.map((section, idx) => (
+          <View key={section.id} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2563EB', marginBottom: 5 }}>{section.title}</Text>
+            <Text style={{ fontSize: 14, color: '#64748B', marginBottom: 10 }}>{section.questionCount} Questions</Text>
+            <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingTop: 10 }}>
+              {section.breakdown.map((item, i) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 13, color: '#475569' }}>{item.type}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1E293B' }}>{item.count}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={{ padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#E2E8F0' }}>
+        <TouchableOpacity style={styles.btnPrimary} onPress={startMockExam}>
+          <Text style={styles.btnText}>Start Exam</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+
+  const renderSectionIntro = () => {
+    const sectionInfo = MOCK_EXAM_SECTIONS_INFO[currentSectionIndex];
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>{sectionInfo.title}</Text>
+          </View>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <View style={{ alignItems: 'center', marginBottom: 30 }}>
+            <MaterialCommunityIcons 
+              name={currentSectionIndex === 0 ? "microphone" : currentSectionIndex === 1 ? "book-open-variant" : "headphones"} 
+              size={80} 
+              color="#2563EB" 
+            />
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E293B', marginTop: 15 }}>{sectionInfo.title}</Text>
+          </View>
+          
+          <View style={{ backgroundColor: '#EFF6FF', padding: 20, borderRadius: 16, marginBottom: 20 }}>
+            <Text style={{ fontSize: 16, color: '#1E293B', lineHeight: 24 }}>{sectionInfo.description}</Text>
+          </View>
+
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 15 }}>Question Breakdown:</Text>
+          {sectionInfo.breakdown.map((item, i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
+              <Text style={{ fontSize: 15, color: '#475569' }}>{item.type}</Text>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1E293B' }}>{item.count}</Text>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={{ padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#E2E8F0' }}>
+          <TouchableOpacity style={styles.btnPrimary} onPress={startSection}>
+            <Text style={styles.btnText}>Start {sectionInfo.title.split(': ')[1]}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  };
+
+  const renderSectionPopup = () => (
+    <View style={[styles.container, { backgroundColor: '#2563EB', justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
+      <MaterialCommunityIcons name="information-outline" size={100} color="#fff" />
+      <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#fff', marginTop: 20, textAlign: 'center' }}>Get Ready!</Text>
+      <Text style={{ fontSize: 18, color: '#BFDBFE', marginTop: 10, textAlign: 'center' }}>
+        The {MOCK_EXAM_SECTIONS_INFO[currentSectionIndex].title.split(': ')[1]} section is about to begin.
+      </Text>
+      <View style={{ marginTop: 40, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontSize: 48, fontWeight: 'bold', color: '#fff' }}>{timeLeft}</Text>
+      </View>
+      <Text style={{ fontSize: 14, color: '#BFDBFE', marginTop: 20 }}>Starting in 5 seconds...</Text>
+    </View>
+  );
+
+  const renderFinalResults = () => {
+    const totalQuestions = MOCK_EXAM_SECTIONS_INFO.reduce((sum, s) => sum + s.questionCount, 0);
+    const totalCorrect = Object.values(sectionScores).reduce((sum, scores) => sum + scores.reduce((a, b) => a + b, 0), 0);
+    const overallScore = Math.round((totalCorrect / totalQuestions) * 90);
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Exam Results</Text>
+          </View>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <View style={{ alignItems: 'center', marginBottom: 30, backgroundColor: '#fff', padding: 30, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 }}>
+            <Text style={{ fontSize: 18, color: '#64748B', fontWeight: 'bold' }}>OVERALL PTE SCORE</Text>
+            <Text style={{ fontSize: 72, fontWeight: 'bold', color: '#2563EB' }}>{overallScore}</Text>
+            <Text style={{ fontSize: 18, color: '#64748B' }}>out of 90</Text>
+          </View>
+
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 15 }}>Section Breakdown</Text>
+          {MOCK_EXAM_SECTIONS_INFO.map((section) => {
+            const scores = sectionScores[section.id] || [];
+            const correct = scores.reduce((a, b) => a + b, 0);
+            const percent = Math.round((correct / section.questionCount) * 100);
+            return (
+              <View key={section.id} style={{ backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>{section.title.split(': ')[1]}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2563EB' }}>{percent}%</Text>
+                </View>
+                <View style={{ height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                  <View style={{ height: '100%', width: `${percent}%`, backgroundColor: '#2563EB' }} />
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>{correct.toFixed(1)} / {section.questionCount} Correct</Text>
+              </View>
+            );
+          })}
+
+          <View style={{ marginTop: 20, backgroundColor: '#F0F9FF', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>AI Feedback & Analysis</Text>
+            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 22 }}>
+              Your overall performance indicates a {overallScore > 79 ? 'superior' : overallScore > 64 ? 'proficient' : overallScore > 49 ? 'competent' : 'developing'} command of academic English.
+              {"\n\n"}
+              <Text style={{fontWeight: 'bold'}}>Strengths:</Text> You performed best in the {
+                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
+                .sort((a,b) => b.score - a.score)[0].name
+              } section. Continue practicing these tasks to maintain your high standard.
+              {"\n\n"}
+              <Text style={{fontWeight: 'bold'}}>Areas for Improvement:</Text> Your scores in {
+                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
+                .sort((a,b) => a.score - b.score)[0].name
+              } suggest you should focus more on these question types. Specifically, ensure you are familiar with the timing and scoring criteria for these tasks.
+              {"\n\n"}
+              <Text style={{fontWeight: 'bold'}}>Next Steps:</Text> We recommend spending 30-60 minutes daily on {
+                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
+                .sort((a,b) => a.score - b.score)[0].name
+              } practice modules. Focus on accuracy first, then work on your speed.
+            </Text>
+          </View>
+        </ScrollView>
+        <View style={{ padding: 20 }}>
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => router.replace('/(tabs)')}>
+            <Text style={styles.btnText}>Back to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  };
+
   if (!moduleInfo && !CATEGORIES[id as string]) return <View><Text>Module not found</Text></View>;
+
+  if (id === 'mock-exam') {
+    if (mockExamFlow === 'MAIN_INTRO') return renderMainIntro();
+    if (mockExamFlow === 'SECTION_INTRO') return renderSectionIntro();
+    if (mockExamFlow === 'SECTION_POPUP') return renderSectionPopup();
+    if (mockExamFlow === 'FINAL_RESULTS') return renderFinalResults();
+  }
 
   if (CATEGORIES[id as string]) {
     const category = CATEGORIES[id as string];
@@ -1845,9 +2141,9 @@ export default function ModuleScreen() {
           ]}>
              {/* TIMER */}
              {(mode === 'RECORDING' || mode === 'PREP') && (
-               <View style={styles.timerBox}>
-                 <Text style={styles.timerText}>{mode === 'PREP' ? 'Preparation' : 'Recording'}</Text>
-                 <Text style={styles.timerCount}>{timeLeft}</Text>
+               <View style={[styles.timerBox, isDescribeImage && { marginBottom: 10 }]}>
+                 <Text style={[styles.timerText, isDescribeImage && { fontSize: 12 }]}>{mode === 'PREP' ? 'Preparation' : 'Recording'}</Text>
+                 <Text style={[styles.timerCount, isDescribeImage && { fontSize: 32 }]}>{timeLeft}</Text>
                </View>
              )}
              
@@ -1905,7 +2201,7 @@ export default function ModuleScreen() {
                         </View>
                       )}
 
-                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture) && result.overall >= 70 && (
+                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture || isRespondSituation) && result.overall >= 70 && (
                          <TouchableOpacity style={{marginTop: 20, alignSelf: 'center'}} onPress={() => setShowModelAnswer(true)}>
                             <Text style={{color: '#2563EB', fontWeight:'bold', textDecorationLine: 'underline'}}>View Top Scoring Answer</Text>
                          </TouchableOpacity>
@@ -2197,7 +2493,7 @@ export default function ModuleScreen() {
               )}
 
              {/* START BUTTONS */}
-             {mode === 'IDLE' && !result && !mcResult && !dictationResult && !highlightResult && !reOrderScore && !fillBlankScore && !rwResult && !lFibResult && !isSummarizeWritten && !isSummarizeSpoken && !isWriteDictation && (
+             {mode === 'IDLE' && !result && !mcResult && !dictationResult && !highlightResult && !reOrderScore && !fillBlankScore && !rwResult && !lFibResult && !isSummarizeWritten && !isSummarizeSpoken && !isWriteDictation && !isEssay && !isRespondSituation && !isSummarizeGroup && (
                 <View style={styles.idleControls}>
                    <TouchableOpacity style={styles.btnPrimary} onPress={() => {
                        if (isPersonalIntro) {
@@ -2349,7 +2645,7 @@ export default function ModuleScreen() {
               <MaterialCommunityIcons name="microphone" size={60} color="#fff" />
             </View>
             <Text style={{ color: '#10B981', fontSize: 36, fontWeight: '900', textAlign: 'center' }}>SPEAK NOW</Text>
-            <Text style={{ color: '#64748B', fontSize: 16, marginTop: 10, fontWeight: '600' }}>Recording has started</Text>
+            <Text style={{ color: '#64748B', fontSize: 16, marginTop: 10, fontWeight: '600' }}>Get ready to speak...</Text>
           </View>
         </View>
       </Modal>
