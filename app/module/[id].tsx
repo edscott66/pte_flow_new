@@ -889,6 +889,13 @@ export default function ModuleScreen() {
 
           if (!res) throw new Error("AI Analysis returned no result");
 
+          // Update adaptive performance metrics
+          await scoreService.updatePerformance({
+            fluency: res.fluency,
+            pronunciation: res.pronunciation,
+            listening_recall: res.content
+          });
+
           // --- ADDED: INITIALIZE BEST SCORE TRACKER ---
           const initialScore = isASQ ? res.content : res.overall;
           setBestScores(prev => ({ ...prev, [currentIndex]: initialScore }));
@@ -947,6 +954,14 @@ export default function ModuleScreen() {
     const res = await analyzeSpeech(lastRecordingUri, ctx, moduleInfo?.title || "PTE Practice"); 
     
     if (!res) throw new Error("AI returned empty result");
+
+    // Update adaptive performance metrics
+    await scoreService.updatePerformance({
+      fluency: res.fluency,
+      pronunciation: res.pronunciation,
+      listening_recall: res.content
+    });
+
     if (res.userTranscript) setUserSummary(res.userTranscript);
     
     // 1. Calculate the points for this specific attempt
@@ -1032,6 +1047,16 @@ export default function ModuleScreen() {
     try {
       const q = questions[currentIndex];
       const res = await analyzeWriting(userSummary, isSummarizeWritten ? q.text : q.transcript, isSummarizeWritten ? "Summarize Written" : "Summarize Spoken");
+      
+      // Update adaptive performance metrics
+      if (res.breakdown) {
+        await scoreService.updatePerformance({
+          grammar: res.breakdown.grammar,
+          vocabulary: res.breakdown.vocabulary,
+          writing_accuracy: res.overall
+        });
+      }
+
       setResult(res);
       const isCorrect = res.overall > 50;
       setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
@@ -1049,6 +1074,16 @@ export default function ModuleScreen() {
     try {
       const q = questions[currentIndex];
       const res = await analyzeWriting(userSummary, q.topic, "Essay");
+      
+      // Update adaptive performance metrics
+      if (res.breakdown) {
+        await scoreService.updatePerformance({
+          grammar: res.breakdown.grammar,
+          vocabulary: res.breakdown.vocabulary,
+          writing_accuracy: res.overall
+        });
+      }
+
       setResult(res);
       const isCorrect = res.overall > 50;
       setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));

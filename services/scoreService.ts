@@ -5,8 +5,41 @@ const TOTAL_SCORE_KEY = 'pte_flow_total_score';
 const USER_NAME_KEY = 'pte_flow_user_name';
 const ORIGINAL_SSID_KEY = 'pte_flow_original_ssid';
 const IS_CREATOR_KEY = 'pte_flow_is_creator';
+const PERFORMANCE_DATA_KEY = 'pte_flow_performance_data';
+
+export interface PerformanceMetrics {
+  fluency: number;
+  pronunciation: number;
+  listening_recall: number;
+  reading_speed: number;
+  grammar: number;
+  vocabulary: number;
+  writing_accuracy: number;
+}
+
+const DEFAULT_PERFORMANCE: PerformanceMetrics = {
+  fluency: 70,
+  pronunciation: 70,
+  listening_recall: 70,
+  reading_speed: 180,
+  grammar: 75,
+  vocabulary: 75,
+  writing_accuracy: 75
+};
 
 export const scoreService = {
+  async getPerformance(): Promise<PerformanceMetrics> {
+    const data = await AsyncStorage.getItem(PERFORMANCE_DATA_KEY);
+    return data ? { ...DEFAULT_PERFORMANCE, ...JSON.parse(data) } : DEFAULT_PERFORMANCE;
+  },
+
+  async updatePerformance(metrics: Partial<PerformanceMetrics>) {
+    const current = await this.getPerformance();
+    const updated = { ...current, ...metrics };
+    await AsyncStorage.setItem(PERFORMANCE_DATA_KEY, JSON.stringify(updated));
+    return updated;
+  },
+
   async isFirstAttempt(questionId: string): Promise<boolean> {
     const attempted = await this.getAttemptedQuestions();
     return !attempted.includes(questionId);

@@ -1,20 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '../../services/scoreService';
 import { db, ensureAuth } from '../../services/firebase';
+import { API_BASE_URL } from '../../constants/config';
 import { collection, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [apiUrl, setApiUrl] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     scoreService.getIsCreator().then(setIsCreator);
+    AsyncStorage.getItem('pte_flow_api_url').then(val => {
+      setApiUrl(val || API_BASE_URL);
+    });
   }, []);
+
+  const handleResetApiUrl = async () => {
+    Alert.alert(
+      "Reset API URL",
+      "This will revert the backend URL to the default value. The app will reload.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          onPress: async () => {
+            await AsyncStorage.removeItem('pte_flow_api_url');
+            setApiUrl(API_BASE_URL);
+            Alert.alert("Success", "API URL reset. Reloading Daily Goals...");
+          }
+        }
+      ]
+    );
+  };
 
   const handleGlobalReset = async () => {
     Alert.alert(
@@ -88,7 +112,7 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>General</Text>
           
-          <TouchableOpacity style={styles.item} onPress={handleLocalReset}>
+            <TouchableOpacity style={styles.item} onPress={handleLocalReset}>
             <View style={[styles.iconContainer, { backgroundColor: '#F1F5F9' }]}>
               <MaterialCommunityIcons name="account-remove" size={24} color="#64748B" />
             </View>
@@ -97,6 +121,18 @@ export default function SettingsScreen() {
               <Text style={styles.itemDesc}>Clear your name and score from this device.</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.item} onPress={handleResetApiUrl}>
+            <View style={[styles.iconContainer, { backgroundColor: '#F1F5F9' }]}>
+              <MaterialCommunityIcons name="api" size={24} color="#64748B" />
+            </View>
+            <View style={styles.itemText}>
+              <Text style={styles.itemTitle}>External API URL</Text>
+              <Text style={styles.itemUrl} numberOfLines={1}>{apiUrl || 'Using Relative Path'}</Text>
+              <Text style={styles.itemDesc}>Tap to reset if Daily Goals fails with 503.</Text>
+            </View>
+            <MaterialCommunityIcons name="refresh" size={24} color="#CBD5E1" />
           </TouchableOpacity>
         </View>
 
@@ -167,6 +203,7 @@ const styles = StyleSheet.create({
   iconContainer: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   itemText: { flex: 1 },
   itemTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
+  itemUrl: { fontSize: 11, color: '#2563EB', marginTop: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   itemDesc: { fontSize: 12, color: '#64748B', marginTop: 2 },
   
   adminSection: { marginTop: 32, paddingBottom: 32 },

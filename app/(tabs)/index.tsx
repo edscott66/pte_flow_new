@@ -65,15 +65,21 @@ export default function HomeScreen() {
         </View>
 
         {/* Daily Progress Card */}
-        <View style={styles.progressCard}>
+        <TouchableOpacity 
+          style={styles.progressCard}
+          onPress={() => router.push('/daily-goals')}
+        >
           <View style={styles.progressInfo}>
-            <Text style={styles.progressTitle}>Daily Goal</Text>
-            <Text style={styles.progressSub}>3/5 modules completed</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.progressTitle}>Daily Goal</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#fff" />
+            </View>
+            <Text style={styles.progressSub}>View your adaptive AI-generated plan</Text>
           </View>
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: '60%' }]} />
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Mock Exam Section */}
         <TouchableOpacity 
