@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { scoreService } from '../../services/scoreService';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { scoreService, RecentActivity } from '../../services/scoreService';
 
 // --- PRACTICE MODULES DATA ---
 const PRACTICE_MODULES = [
@@ -40,6 +40,48 @@ const PRACTICE_MODULES = [
 export default function HomeScreen() {
   const router = useRouter();
   const [userName, setUserName] = useState("PTE Student");
+  const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null);
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const waveAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(waveAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(waveAnim, { toValue: -1, duration: 150, useNativeDriver: true }),
+        Animated.timing(waveAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(waveAnim, { toValue: -1, duration: 150, useNativeDriver: true }),
+        Animated.timing(waveAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.delay(2000),
+      ])
+    ).start();
+  }, [pulseAnim, waveAnim]);
+
+  const borderOpacityAnim = pulseAnim.interpolate({
+    inputRange: [1, 1.05],
+    outputRange: [0, 1]
+  });
+
+  const waveRotation = waveAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-20deg', '0deg', '20deg']
+  });
 
   useEffect(() => {
     const loadUser = async () => {
@@ -49,6 +91,31 @@ export default function HomeScreen() {
     loadUser();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      const loadActivity = async () => {
+        const activity = await scoreService.getRecentActivity();
+        setRecentActivity(activity);
+      };
+      loadActivity();
+    }, [])
+  );
+
+  const formatTimeAgo = (timestampString: string) => {
+    const date = new Date(timestampString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -57,10 +124,24 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{userName} 👋</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.userName}>{userName}</Text>
+              <Animated.Text style={[styles.userName, { transform: [{ rotate: waveRotation }], marginLeft: 8 }]}>
+                👋
+              </Animated.Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/profile')}>
-            <View style={styles.avatarPlaceholder} />
+          <TouchableOpacity onPress={() => router.push('/profile')}>
+            <Animated.View style={[styles.profileButton, {
+              transform: [{ scale: pulseAnim }],
+              borderColor: 'rgba(192, 156, 50, 1)',
+              borderWidth: borderOpacityAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 2]
+              }),
+            }]}>
+              <Image source={require('../../assets/images/BBLPTF.png')} style={styles.avatarImage} />
+            </Animated.View>
           </TouchableOpacity>
         </View>
 
@@ -115,17 +196,26 @@ export default function HomeScreen() {
         </View>
 
         {/* Recent Activity */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.activityCard}>
-          <View style={styles.activityIcon}>
-            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-          </View>
-          <View style={styles.activityInfo}>
-            <Text style={styles.activityTitle}>Read Aloud Practice</Text>
-            <Text style={styles.activityTime}>2 hours ago • Score: 78/90</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-        </View>
+        {recentActivity && (
+          <>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity 
+              style={styles.activityCard}
+              onPress={() => router.push(`/module/${recentActivity.moduleId}?startIndex=${recentActivity.questionIndex}`)}
+            >
+              <View style={styles.activityIcon}>
+                <Ionicons name="time-outline" size={24} color="#2563EB" />
+              </View>
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityTitle}>{recentActivity.moduleTitle}</Text>
+                <Text style={styles.activityTime}>
+                  {formatTimeAgo(recentActivity.timestamp)} • Continue at Q{recentActivity.questionIndex + 1}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          </>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -139,8 +229,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   welcomeText: { fontSize: 14, color: '#64748B' },
   userName: { fontSize: 24, fontWeight: 'bold', color: '#1E293B' },
-  profileButton: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
-  avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#E2E8F0' },
+  profileButton: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 24 },
 
   progressCard: { backgroundColor: '#2563EB', padding: 20, borderRadius: 20, marginBottom: 24 },
   progressInfo: { marginBottom: 12 },

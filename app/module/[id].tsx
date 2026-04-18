@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Dimensions, FlatList, Image, Modal, ScrollView, TextInput, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, FlatList, Image, Modal, ScrollView, TextInput, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateMockExam } from '../../utils/mockExamGenerator';
+import CustomLoader from '../../components/CustomLoader';
 
 // Import All Data Files
 import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '../../constants/multipleChoiceReadingSingleData';
@@ -32,7 +33,7 @@ import { ESSAY_QUESTIONS } from '../../constants/essayData';
 import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
 import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
 import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { analyzeSpeech, analyzeWriting } from '../../services/geminiService';
 import { scoreService } from '../../services/scoreService';
 import { networkService } from '../../services/networkService';
@@ -140,10 +141,13 @@ const MOCK_EXAM_SECTIONS_INFO = [
 ];
 
 export default function ModuleScreen() {
+  const { id, startIndex } = useLocalSearchParams();
+  const router = useRouter();
+
   // 1. STATE DEFINITIONS (Fixes setQuestions and setLoading errors)
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(startIndex ? parseInt(startIndex as string, 10) : 0);
   const [bestScores, setBestScores] = useState<{[key: number]: number}>({});
   const [scoreFeedback, setScoreFeedback] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
 
@@ -214,8 +218,6 @@ export default function ModuleScreen() {
     }
   };
 
-  const { id } = useLocalSearchParams();
-  const router = useRouter();
   const moduleInfo = MODULES.find(m => m.id === id);
 
   // 2. ACTIVE TYPE DEFINITION (Fixes activeType error)
@@ -415,6 +417,23 @@ export default function ModuleScreen() {
 
   const [scoredQuestions, setScoredQuestions] = useState<Record<number, number>>({});
   const currentSessionScore = Object.values(scoredQuestions).reduce((sum, val) => sum + val, 0);
+
+  useEffect(() => {
+    if (id && id !== 'mock-exam' && moduleInfo && questions.length > 0) {
+      // If the user has scored/answered the current question, we set resumeIndex to next question (safely capped)
+      const hasAnsweredCurrent = scoredQuestions[currentIndex] !== undefined || mode === 'RESULT';
+      const resumeIndex = hasAnsweredCurrent 
+        ? Math.min(currentIndex + 1, questions.length - 1) 
+        : currentIndex;
+
+      scoreService.setRecentActivity({
+        moduleId: id as string,
+        moduleTitle: moduleInfo.title,
+        questionIndex: resumeIndex,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [id, currentIndex, scoredQuestions, mode, questions.length, moduleInfo]);
 
   const flatListRef = useRef<FlatList>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -2581,8 +2600,7 @@ export default function ModuleScreen() {
              {/* SPINNER */}
              {(mode === 'PROCESSING' || mode === 'PLAYING_AUDIO' || mode === 'PREP_RETELL') && (
                <View style={{ alignItems: 'center', padding: 20 }}>
-                 <ActivityIndicator size="large" color="#2563EB" />
-                 {mode === 'PROCESSING' && <Text style={{color: '#64748B', marginTop: 10, fontStyle: 'italic'}}>Processing results...</Text>}
+                 <CustomLoader message={mode === 'PROCESSING' ? "Processing results..." : undefined} />
                </View>
              )}
 

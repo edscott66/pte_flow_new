@@ -12,7 +12,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Listen for Global Reset Signal
-    const unsubscribe = onSnapshot(doc(db, 'config', 'reset'), async (snapshot) => {
+    const unsubscribe = onSnapshot(doc(db, 'config', 'reset'), async (snapshot: any) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         const lastReset = await AsyncStorage.getItem('pte_flow_last_reset');

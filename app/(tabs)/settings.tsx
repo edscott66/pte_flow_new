@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '../../services/scoreService';
@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../../constants/config';
 import { collection, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomLoader from '../../components/CustomLoader';
 
 export default function SettingsScreen() {
   const [isCreator, setIsCreator] = useState(false);
@@ -58,7 +59,7 @@ export default function SettingsScreen() {
               const q = collection(db, 'leaderboard');
               const snapshot = await getDocs(q);
               
-              const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, 'leaderboard', d.id)));
+              const deletePromises = snapshot.docs.map((d: any) => deleteDoc(doc(db, 'leaderboard', d.id)));
               await Promise.all(deletePromises);
               
               // 2. Send Global Reset Signal
@@ -156,7 +157,7 @@ export default function SettingsScreen() {
                 <Text style={styles.itemDesc}>Delete ALL student scores from the cloud.</Text>
               </View>
               {loading ? (
-                <ActivityIndicator size="small" color="#EF4444" />
+                <CustomLoader size={30} />
               ) : (
                 <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#FCA5A5" />
               )}

@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { scoreService } from '../services/scoreService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db, ensureAuth, handleFirestoreError, OperationType } from '../services/firebase';
@@ -12,6 +12,30 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  const opacityAnim = pulseAnim.interpolate({
+    inputRange: [1, 1.05],
+    outputRange: [1, 0.8]
+  });
 
   useEffect(() => {
     checkUser();
@@ -77,7 +101,7 @@ export default function WelcomeScreen() {
           if (!querySnapshot.empty) {
             // Sort in memory if we have multiple results from the simple query
             const docs = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
-            docs.sort((a, b) => (b.score || 0) - (a.score || 0));
+            docs.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
             
             const bestDoc = docs[0];
             userId = bestDoc.id;
@@ -89,7 +113,7 @@ export default function WelcomeScreen() {
             if (docs.length > 1) {
               console.log(`[Firebase Sync] Cleaning up ${docs.length - 1} duplicate sessions...`);
               for (let i = 1; i < docs.length; i++) {
-                deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch(e => console.log("Cleanup failed", e));
+                deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch((e: any) => console.log("Cleanup failed", e));
               }
             }
             
@@ -122,7 +146,7 @@ export default function WelcomeScreen() {
             const querySnapshot = await getDocs(simpleQ);
             if (!querySnapshot.empty) {
               const docs = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
-              docs.sort((a, b) => (b.score || 0) - (a.score || 0));
+              docs.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
               const bestDoc = docs[0];
               userId = bestDoc.id;
               const cloudScore = bestDoc.score || 0;
@@ -130,7 +154,7 @@ export default function WelcomeScreen() {
               // Cleanup: Delete other sessions with the same name that have lower scores
               if (docs.length > 1) {
                 for (let i = 1; i < docs.length; i++) {
-                  deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch(e => {});
+                  deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch((e: any) => {});
                 }
               }
 
@@ -202,10 +226,22 @@ export default function WelcomeScreen() {
       
       {/* Background/Logo Section */}
       <View style={styles.heroSection}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>PTE</Text>
-          <Text style={styles.logoSubText}>FLOW</Text>
-        </View>
+        <Animated.View style={[styles.logoContainer, {
+          transform: [{ scale: pulseAnim }],
+          opacity: opacityAnim,
+          borderWidth: 3,
+          borderColor: '#c09c32'
+        }]}>
+          <Image
+            source={require('../assets/images/BBLPTF.png')}
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: 27,
+            }}
+            resizeMode="cover"
+          />
+        </Animated.View>
       </View>
 
       {/* Content Section */}

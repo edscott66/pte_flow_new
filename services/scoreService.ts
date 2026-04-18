@@ -6,6 +6,9 @@ const USER_NAME_KEY = 'pte_flow_user_name';
 const ORIGINAL_SSID_KEY = 'pte_flow_original_ssid';
 const IS_CREATOR_KEY = 'pte_flow_is_creator';
 const PERFORMANCE_DATA_KEY = 'pte_flow_performance_data';
+const RECENT_ACTIVITY_KEY = 'pte_flow_recent_activity';
+const TARGET_SCORE_KEY = 'pte_flow_target_score';
+const AVATAR_URI_KEY = 'pte_flow_avatar_uri';
 
 export interface PerformanceMetrics {
   fluency: number;
@@ -15,6 +18,13 @@ export interface PerformanceMetrics {
   grammar: number;
   vocabulary: number;
   writing_accuracy: number;
+}
+
+export interface RecentActivity {
+  moduleId: string;
+  moduleTitle: string;
+  questionIndex: number;
+  timestamp: string;
 }
 
 const DEFAULT_PERFORMANCE: PerformanceMetrics = {
@@ -105,6 +115,32 @@ export const scoreService = {
     return data === 'true';
   },
 
+  async setRecentActivity(activity: RecentActivity) {
+    await AsyncStorage.setItem(RECENT_ACTIVITY_KEY, JSON.stringify(activity));
+  },
+
+  async getRecentActivity(): Promise<RecentActivity | null> {
+    const data = await AsyncStorage.getItem(RECENT_ACTIVITY_KEY);
+    return data ? JSON.parse(data) : null;
+  },
+
+  async getTargetScore(): Promise<number> {
+    const data = await AsyncStorage.getItem(TARGET_SCORE_KEY);
+    return data ? parseInt(data, 10) : 79;
+  },
+
+  async setTargetScore(score: number) {
+    await AsyncStorage.setItem(TARGET_SCORE_KEY, score.toString());
+  },
+
+  async getAvatarUri(): Promise<string | null> {
+    return await AsyncStorage.getItem(AVATAR_URI_KEY);
+  },
+
+  async setAvatarUri(uri: string) {
+    await AsyncStorage.setItem(AVATAR_URI_KEY, uri);
+  },
+
   async clearAllLocalData() {
     const keys = [
       ATTEMPTED_QUESTIONS_KEY,
@@ -112,6 +148,9 @@ export const scoreService = {
       USER_NAME_KEY,
       ORIGINAL_SSID_KEY,
       IS_CREATOR_KEY,
+      RECENT_ACTIVITY_KEY,
+      TARGET_SCORE_KEY,
+      AVATAR_URI_KEY,
       'pte_flow_user_id'
     ];
     await AsyncStorage.multiRemove(keys);

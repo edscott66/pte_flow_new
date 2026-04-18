@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { motion, AnimatePresence } from 'motion/react';
@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../constants/config';
 import { generateDailyGoals } from '../logic/daily_goals_engine';
 import { scoreService, PerformanceMetrics } from '../services/scoreService';
+import CustomLoader from '../components/CustomLoader';
 
 interface DailyGoalTask {
   task_name: string;
@@ -161,9 +162,7 @@ export default function DailyGoalsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Generating your adaptive goals...</Text>
-        <Text style={styles.loadingSubText}>Connecting to: {apiUrl || '(Local)'}</Text>
+        <CustomLoader message="Generating your adaptive goals..." />
       </View>
     );
   }
@@ -488,8 +487,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  loadingTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginTop: 20,
+  },
   loadingText: {
-    marginTop: 16,
+    marginTop: 8,
     fontSize: 16,
     color: '#64748B',
     fontWeight: '500',

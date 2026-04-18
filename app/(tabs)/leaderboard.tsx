@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 // import QRCode from 'react-native-qrcode-svg';
@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { Image } from 'react-native';
+import CustomLoader from '../../components/CustomLoader';
 
 interface Lead {
   userId?: string;
@@ -39,8 +40,8 @@ export default function Leaderboard() {
     setLoading(true);
     const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(50));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const rawData = snapshot.docs.map(doc => ({
+    const unsubscribe = onSnapshot(q, (snapshot: any) => {
+      const rawData = snapshot.docs.map((doc: any) => ({
         userId: doc.id,
         ...doc.data()
       })) as Lead[];
@@ -56,7 +57,7 @@ export default function Leaderboard() {
       const sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
       setLeads(sortedLeads);
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
       handleFirestoreError(error, OperationType.LIST, 'leaderboard');
       setLoading(false);
     });
@@ -139,21 +140,28 @@ export default function Leaderboard() {
     }
   };
 
-  const renderLead = ({ item, index }: { item: Lead, index: number }) => (
-    <View style={styles.leadRow}>
-      <View style={styles.rankContainer}>
-        <Text style={styles.rankText}>{index + 1}</Text>
+  const renderLead = ({ item, index }: { item: Lead, index: number }) => {
+    let bgColor = '#fff';
+    if (index === 0) bgColor = '#FEF3C7'; // Subtle Gold
+    else if (index === 1) bgColor = '#F1F5F9'; // Subtle Silver
+    else if (index === 2) bgColor = '#FFEDD5'; // Subtle Bronze
+
+    return (
+      <View style={[styles.leadRow, { backgroundColor: bgColor }]}>
+        <View style={styles.rankContainer}>
+          <Text style={styles.rankText}>{index + 1}</Text>
+        </View>
+        <View style={styles.nameContainer}>
+          <Text style={styles.nameText}>{item.name}</Text>
+          <Text style={styles.timeText}>{new Date(item.lastUpdate).toLocaleTimeString()}</Text>
+        </View>
+        <View style={styles.scoreContainer}>
+          <Text style={styles.scoreText}>{item.score}</Text>
+          <Text style={styles.ptsLabel}>PTS</Text>
+        </View>
       </View>
-      <View style={styles.nameContainer}>
-        <Text style={styles.nameText}>{item.name}</Text>
-        <Text style={styles.timeText}>{new Date(item.lastUpdate).toLocaleTimeString()}</Text>
-      </View>
-      <View style={styles.scoreContainer}>
-        <Text style={styles.scoreText}>{item.score}</Text>
-        <Text style={styles.ptsLabel}>PTS</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -198,7 +206,7 @@ export default function Leaderboard() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
+        <CustomLoader message="Loading leaderboard..." />
       ) : (
         <FlatList
           data={leads}
