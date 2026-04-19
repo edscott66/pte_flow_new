@@ -134,9 +134,50 @@ export default function ExamInfoScreen() {
           )}
         </View>
 
-        {/* --- FUTURE SECTIONS --- */}
-        <View style={styles.cardPlaceholder}>
-          <Text style={styles.placeholderText}>More sections coming soon...</Text>
+        {/* --- SECTION 3: DISCLAIMER --- */}
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.cardHeader} onPress={() => toggleSection('disclaimer')}>
+            <View style={styles.headerLeft}>
+              <Ionicons name="information-circle" size={24} color="#8B5CF6" />
+              <Text style={styles.cardTitle}>Disclaimer</Text>
+            </View>
+            <Ionicons name={expandedSection === 'disclaimer' ? "chevron-up" : "chevron-down"} size={20} color="#64748B" />
+          </TouchableOpacity>
+
+          {expandedSection === 'disclaimer' && (
+            <View style={styles.cardContent}>
+              <Text style={styles.disclaimerTitle}>PTE Flow – Disclaimer</Text>
+              <Text style={styles.disclaimerText}>
+                PTE Flow is an independent practice and learning tool designed to help users prepare for the Pearson Test of English (PTE). It is not affiliated with, endorsed by, or sponsored by Pearson PLC or any of its subsidiaries.
+              </Text>
+              
+              <Text style={styles.disclaimerText}>
+                All practice items, sample questions, scoring simulations, and feedback provided in the app are created for educational purposes only. They do not represent official PTE exam content, scoring algorithms, or outcomes.
+              </Text>
+              
+              <Text style={styles.disclaimerText}>
+                Scores, band estimates, and AI‑generated feedback are approximations intended to support learning and self‑assessment. They should not be interpreted as official PTE results or guarantees of performance in the actual exam.
+              </Text>
+              
+              <Text style={styles.disclaimerText}>
+                While we aim for accuracy and reliability, PTE Flow cannot guarantee error‑free content or uninterrupted service. Users are responsible for verifying information and using the app as a supplementary study resource.
+              </Text>
+              
+              <Text style={styles.disclaimerText}>
+                By using PTE Flow, you agree that the developers are not liable for exam outcomes, academic decisions, or any losses arising from reliance on the app’s content or features.
+              </Text>
+
+              <Text style={styles.disclaimerSubtitle}>AI‑Generated Scoring & Feedback</Text>
+              <Text style={styles.disclaimerText}>
+                PTE Flow uses automated scoring and AI‑powered feedback to support learning. These outputs may not always reflect human‑marker judgement and should be used as guidance rather than definitive evaluation.
+              </Text>
+
+              <Text style={styles.disclaimerSubtitle}>Data & Audio Processing</Text>
+              <Text style={styles.disclaimerText}>
+                All audio recordings and user data are processed securely and used only for practice, scoring, and app functionality. No data is shared with third parties without user consent.
+              </Text>
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -154,7 +195,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
-  cardContent: { padding: 20, paddingTop: 0, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  cardContent: { padding: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
 
   // Question Types Styles
   partContainer: { marginTop: 20 },
@@ -180,7 +221,8 @@ const styles = StyleSheet.create({
   col2: { flex: 1, textAlign: 'center', fontSize: 14 },
   col3: { flex: 1, textAlign: 'center', fontSize: 14, color: '#64748B' },
 
-  // Footer
-  cardPlaceholder: { padding: 20, alignItems: 'center', opacity: 0.5 },
-  placeholderText: { color: '#94A3B8', fontStyle: 'italic' }
+  // Disclaimer Styles
+  disclaimerTitle: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginBottom: 10 },
+  disclaimerSubtitle: { fontSize: 15, fontWeight: 'bold', color: '#475569', marginTop: 15, marginBottom: 6 },
+  disclaimerText: { fontSize: 13, color: '#64748B', lineHeight: 20, marginBottom: 10 }
 });

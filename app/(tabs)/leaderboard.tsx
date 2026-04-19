@@ -142,9 +142,15 @@ export default function Leaderboard() {
 
   const renderLead = ({ item, index }: { item: Lead, index: number }) => {
     let bgColor = '#fff';
-    if (index === 0) bgColor = '#FEF3C7'; // Subtle Gold
-    else if (index === 1) bgColor = '#F1F5F9'; // Subtle Silver
-    else if (index === 2) bgColor = '#FFEDD5'; // Subtle Bronze
+    if (index === 0) bgColor = '#F0D089'; // Subtle Gold
+    else if (index === 1) bgColor = '#CFCCCC'; // Subtle Silver
+    else if (index === 2) bgColor = '#FAC38C'; // Subtle Bronze
+
+    const dateObj = new Date(item.lastUpdate);
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const year = dateObj.getFullYear();
+    const formattedDate = `${day} / ${month} / ${year}`;
 
     return (
       <View style={[styles.leadRow, { backgroundColor: bgColor }]}>
@@ -153,7 +159,7 @@ export default function Leaderboard() {
         </View>
         <View style={styles.nameContainer}>
           <Text style={styles.nameText}>{item.name}</Text>
-          <Text style={styles.timeText}>{new Date(item.lastUpdate).toLocaleTimeString()}</Text>
+          <Text style={styles.timeText}>{formattedDate}</Text>
         </View>
         <View style={styles.scoreContainer}>
           <Text style={styles.scoreText}>{item.score}</Text>
