@@ -15,6 +15,7 @@ interface DailyGoalTask {
   skill_trained: string;
   why_it_matters_for_pte: string;
   estimated_time_minutes: number;
+  module_id: string;
 }
 
 interface DailyGoalsData {
@@ -336,6 +337,17 @@ export default function DailyGoalsScreen() {
           </View>
         )}
 
+        <View style={styles.explainerCard}>
+          <MaterialCommunityIcons name="information" size={24} color="#3B82F6" style={{marginBottom: 8}}/>
+          <Text style={styles.explainerTitle}>How Daily Goals Work</Text>
+          <Text style={styles.explainerText}>
+            Our adaptive engine analyzes your weakest areas and selects the highest-impact PTE tasks to improve your overall score. You don't need to memorize answers; instead, the randomizer provides varied questions to train your core skills (like fluency, grammar, and recall).
+          </Text>
+          <Text style={[styles.explainerText, {marginTop: 8, fontWeight: 'bold'}]}>
+            Tap "Start Task" on any of the focus areas below to begin your personalized daily training.
+          </Text>
+        </View>
+
         <Text style={styles.sectionTitle}>Today's Focus Tasks</Text>
         {data.daily_goals.map((task, index) => (
           <MotionView
@@ -361,7 +373,10 @@ export default function DailyGoalsScreen() {
                 <Text style={styles.taskTime}>{task.estimated_time_minutes} mins</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.startBtn}>
+            <TouchableOpacity 
+              style={styles.startBtn}
+              onPress={() => router.push({ pathname: `/module/${task.module_id || 'mock-exam'}`, params: { startIndex: 'random' } })}
+            >
               <MaterialCommunityIcons name="play" size={20} color="#fff" />
             </TouchableOpacity>
           </MotionView>
@@ -614,6 +629,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1E293B',
     marginBottom: 16,
+  },
+  explainerCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  explainerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 6,
+  },
+  explainerText: {
+    fontSize: 14,
+    color: '#1E40AF',
+    lineHeight: 20,
   },
   taskCard: {
     backgroundColor: '#fff',

@@ -85,9 +85,12 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
            * IMPORTANT: Each section MUST explicitly refer to the PTE Academic scoring criteria.
            * Explain exactly WHAT the user needs to do to achieve a high score (e.g., "To get a 90 in Oral Fluency, you must maintain a consistent pace without self-corrections or hesitations, as per PTE standards").
            * Use simple, actionable language for the "How to fix" part (e.g., "You stressed the second syllable of 'Photograph', try PHO-to-graph").
-      5. Word-Level Analysis:
-         - Identify specific words that were mispronounced, omitted, or unclear.
-         - For each mistake, provide a simple label: "Omitted", "Mispronounced", or "Unclear".
+      9. Word-Level Analysis (The Heatmap):
+         - Provide an array called "wordAnalysis" mapping EVERY word from the Target Text to how the user pronounced it. 
+         - For each word, provide:
+           * "word": The CORRECT dictionary spelling of the target word from the text. NEVER use phonetic or misspelled versions (e.g., write "species", never "spakies"). If the user added an extra word not in the text, spell it correctly in standard English.
+           * "health": "good" (pronounced correctly), "bad" (mispronounced, garbled, or skipped).
+           * "label": optional explanation if bad (e.g., "Omitted", "Mispronounced as 'spakies'").
       
       Return the result as a JSON object with:
       - userTranscript (string)
@@ -98,7 +101,7 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
       - feedback (string, summary)
       - sectionFeedback (object with keys: pronunciation, fluency, content. Each value is a detailed coaching string)
       - breakdown (object with keys: pronunciation, fluency, content)
-      - mistakes (array of objects with keys: word, score (0-100), label)
+      - wordAnalysis (array of objects with keys: word, health ('good'|'bad'), label (optional))
     `;
 
     const ai = getAI();
@@ -116,7 +119,7 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
       contents: contents,
       config: { 
         responseMimeType: "application/json",
-        maxOutputTokens: 1000,
+        maxOutputTokens: 4000,
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.OBJECT,
@@ -145,25 +148,27 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
               },
               required: ["pronunciation", "fluency", "content"]
             },
-            mistakes: {
+            wordAnalysis: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   word: { type: Type.STRING },
-                  score: { type: Type.NUMBER },
+                  health: { type: Type.STRING },
                   label: { type: Type.STRING }
                 },
-                required: ["word", "score", "label"]
+                required: ["word", "health"]
               }
             }
           },
-          required: ["userTranscript", "pronunciation", "fluency", "content", "overall", "feedback", "sectionFeedback", "breakdown", "mistakes"]
+          required: ["userTranscript", "pronunciation", "fluency", "content", "overall", "feedback", "sectionFeedback", "breakdown", "wordAnalysis"]
         }
       }
     });
 
-    const res = JSON.parse(response.text || "{}");
+    let rawText = response.text || "{}";
+    rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const res = JSON.parse(rawText);
     return {
       ...res,
       sectionFeedback: res.sectionFeedback || null,
@@ -172,7 +177,7 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
         fluency: res.fluency || 0,
         content: res.content || 0
       },
-      mistakes: res.mistakes || []
+      wordAnalysis: res.wordAnalysis || []
     };
   } catch (error) {
     console.error("AI Speech Analysis Error:", error);
@@ -184,6 +189,69 @@ export const analyzeSpeech = async (audioUri: string, questionText: string, ques
  * Analyze writing for PTE tasks.
  * Uses Gemini 1.5 Flash as the primary engine for high-quality coaching and scoring.
  */
+function writeString(view: DataView, offset: number, string: string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function pcmBase64ToWavDataUri(pcmB64: string, sampleRate = 24000): string {
+    const binaryStr = atob(pcmB64);
+    const pcmLength = binaryStr.length;
+    
+    const buffer = new ArrayBuffer(44);
+    const view = new DataView(buffer);
+    
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + pcmLength, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, pcmLength, true);
+    
+    const headerBytes = new Uint8Array(buffer);
+    let wavHeaderBinary = '';
+    for (let i = 0; i < headerBytes.length; i++) {
+        wavHeaderBinary += String.fromCharCode(headerBytes[i]);
+    }
+    
+    return 'data:audio/wav;base64,' + btoa(wavHeaderBinary + binaryStr);
+}
+
+export const synthesizeSpeech = async (text: string): Promise<string | null> => {
+    try {
+        const ai = getAI();
+        const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [{ parts: [{ text }] }],
+            config: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: 'Aoede' } // High-quality British-style voice
+                    }
+                }
+            }
+        });
+        
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+            return pcmBase64ToWavDataUri(base64Audio, 24000);
+        }
+        return null;
+    } catch (e) {
+        console.error("TTS Error:", e);
+        return null;
+    }
+};
+
 export const analyzeWriting = async (userSummary: string, originalTranscript: string, taskType: string) => {
   try {
     const prompt = `
@@ -264,7 +332,9 @@ export const analyzeWriting = async (userSummary: string, originalTranscript: st
       }
     });
 
-    const res = JSON.parse(response.text || "{}");
+    let rawText = response.text || "{}";
+    rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const res = JSON.parse(rawText);
     return {
       overall: res.overall || 0,
       feedback: res.feedback || "Analysis complete.",

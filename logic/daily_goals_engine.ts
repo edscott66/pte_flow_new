@@ -18,6 +18,7 @@ export interface DailyGoalTask {
   skill_trained: string;
   why_it_matters_for_pte: string;
   estimated_time_minutes: number;
+  module_id: string;
 }
 
 export interface DailyGoalsOutput {
@@ -34,49 +35,57 @@ const ALL_TASKS: DailyGoalTask[] = [
     task_name: "Read Aloud Pacing",
     skill_trained: "Speaking fluency",
     why_it_matters_for_pte: "Ensures a steady rhythm without hesitations, a key scoring factor.",
-    estimated_time_minutes: 3
+    estimated_time_minutes: 3,
+    module_id: "read-aloud"
   },
   {
     task_name: "Describe Image Trends",
     skill_trained: "Speaking fluency",
     why_it_matters_for_pte: "Develops the ability to speak continuously while analyzing visual data.",
-    estimated_time_minutes: 4
+    estimated_time_minutes: 4,
+    module_id: "describe-image"
   },
   {
     task_name: "Repeat Sentence Shadowing",
     skill_trained: "Listening recall",
     why_it_matters_for_pte: "Trains the brain to retain and reproduce complex sentence structures.",
-    estimated_time_minutes: 2
+    estimated_time_minutes: 2,
+    module_id: "repeat-sentence"
   },
   {
     task_name: "Listening Fill in the Blanks",
     skill_trained: "Listening recall",
     why_it_matters_for_pte: "Sharpens real-time word recognition and spelling accuracy.",
-    estimated_time_minutes: 3
+    estimated_time_minutes: 3,
+    module_id: "fill-blanks-listening"
   },
   {
     task_name: "Summarize Written Text",
     skill_trained: "Grammar control",
     why_it_matters_for_pte: "Tests the ability to condense information into a single, grammatically perfect sentence.",
-    estimated_time_minutes: 4
+    estimated_time_minutes: 4,
+    module_id: "summarize-written"
   },
   {
     task_name: "Pronunciation Drill: Vowel Clarity",
     skill_trained: "Pronunciation consistency",
     why_it_matters_for_pte: "Ensures AI scoring engines can accurately map your speech to text.",
-    estimated_time_minutes: 2
+    estimated_time_minutes: 2,
+    module_id: "read-aloud"
   },
   {
     task_name: "Speed Reading: Scanning for Keywords",
     skill_trained: "Reading speed & scanning",
     why_it_matters_for_pte: "Reduces time spent on long passages by locating key info faster.",
-    estimated_time_minutes: 3
+    estimated_time_minutes: 3,
+    module_id: "re-order-paragraphs"
   },
   {
     task_name: "Vocabulary Expansion: Academic Synonyms",
     skill_trained: "Vocabulary range",
     why_it_matters_for_pte: "Increases lexical diversity scores in both writing and speaking.",
-    estimated_time_minutes: 3
+    estimated_time_minutes: 3,
+    module_id: "fill-blanks-rw"
   }
 ];
 

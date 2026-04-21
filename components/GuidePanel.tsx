@@ -17,7 +17,7 @@ import {
   Zap,
   ShieldCheck,
   Code2
-} from 'lucide-react-native';
+} from 'lucide-react';
 import { ProjectStats } from '../types';
 
 interface Props {

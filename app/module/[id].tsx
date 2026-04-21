@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, FlatList, Image, Modal, ScrollView, TextInput, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -34,7 +34,7 @@ import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData';
 import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
 import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
 import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
-import { analyzeSpeech, analyzeWriting } from '../../services/geminiService';
+import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '../../services/geminiService';
 import { scoreService } from '../../services/scoreService';
 import { networkService } from '../../services/networkService';
 import { Config } from '../../constants/config';
@@ -139,6 +139,58 @@ const MOCK_EXAM_SECTIONS_INFO = [
     ]
   }
 ];
+
+const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, handleLFibChange, styles }: any) => {
+  return (
+    <ScrollView 
+        style={{flex: 1}} 
+        contentContainerStyle={{paddingBottom: 40}}
+        keyboardShouldPersistTaps="handled"
+    >
+      <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: 4}}>
+        {item.segments.map((segment: string, i: number) => {
+          // Keep spaces by splitting with capture group
+          const words = segment.split(/(\s+)/);
+          return (
+            <React.Fragment key={`frag-${i}`}>
+              {words.map((word, wIdx) => (
+                <Text key={`word-${i}-${wIdx}`} style={styles.fibText}>
+                  {word}
+                </Text>
+              ))}
+              {i < item.segments.length - 1 && (
+                <TextInput 
+                  key={`input-${i}`}
+                  style={[
+                    styles.inlineInput, 
+                    { 
+                      minWidth: 100,
+                      width: Math.max(100, (lFibAnswers[i]?.length || 0) * 8 + 30), 
+                      marginHorizontal: 4, 
+                      height: 38,
+                      paddingVertical: 0,
+                      backgroundColor: '#fff',
+                      fontSize: 16,
+                      borderBottomWidth: 2,
+                      borderBottomColor: '#2563EB'
+                    },
+                    lFibResult ? (lFibAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
+                  ]} 
+                  placeholder="..." 
+                  value={lFibAnswers[i] || ""} 
+                  onChangeText={(text) => handleLFibChange(text, i)} 
+                  editable={!lFibResult} 
+                  autoCapitalize="none" 
+                  autoCorrect={false}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+});
 
 export default function ModuleScreen() {
   const { id, startIndex } = useLocalSearchParams();
@@ -294,9 +346,13 @@ export default function ModuleScreen() {
         else if (id === 'fill-blanks-listening') loaded = LISTENING_FILL_BLANKS_QUESTIONS;
     }
 
+    if (startIndex === 'random' && loaded.length > 0) {
+        setCurrentIndex(Math.floor(Math.random() * loaded.length));
+    }
+    
     setQuestions(loaded ||[]); 
     setLoading(false);
-  }, [id]);
+  }, [id, startIndex]);
 
   // --- GLOBAL STATE ---
   const [mode, setMode] = useState<TimerMode>('IDLE');
@@ -400,7 +456,7 @@ export default function ModuleScreen() {
                 {isPlaying ? "Stop" : label}
             </Text>
         </TouchableOpacity>
-        <PlaybackSpeedToggle />
+        {PlaybackSpeedToggle()}
     </View>
   );
   
@@ -414,6 +470,8 @@ export default function ModuleScreen() {
   const [currentZoomImage, setCurrentZoomImage] = useState<any>(null);
 
   const [voiceId, setVoiceId] = useState<string | null>(null);
+  const [isVoiceReady, setIsVoiceReady] = useState(false);
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
 
   const [scoredQuestions, setScoredQuestions] = useState<Record<number, number>>({});
   const currentSessionScore = Object.values(scoredQuestions).reduce((sum, val) => sum + val, 0);
@@ -449,18 +507,34 @@ export default function ModuleScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
     })();
 
-    const getVoices = async () => {
+    const getVoices = async (retries = 3) => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
+        
+        // OS TTS engines (especially Android) can be "cold" and return an empty list 
+        // on the very first time they are called. We wait and retry to let the OS wake up.
+        if (voices.length === 0 && retries > 0) {
+            setTimeout(() => getVoices(retries - 1), 800);
+            return;
+        }
+
+        // 1. Target iOS explicit male voices first (Daniel, Arthur)
         let bestVoice = voices.find(v => v.identifier.includes("Daniel") || v.identifier.includes("Arthur")); 
-        if (!bestVoice) bestVoice = voices.find(v => v.identifier.includes('en-gb') && v.identifier.includes('network'));
-        if (!bestVoice) bestVoice = voices.find(v => v.language.includes('en-GB') && v.quality === Speech.VoiceQuality.Enhanced);
+        
+        // 2. Target Android explicit OFFLINE male voices (rjs-local, gbd-local).
+        if (!bestVoice) bestVoice = voices.find(v => v.identifier.includes('en-gb') && (v.identifier.includes('rjs-local') || v.identifier.includes('gbd-local')));
+        
+        // 3. Fallback: Any offline en-GB voice
+        if (!bestVoice) bestVoice = voices.find(v => v.identifier.includes('en-gb') && v.identifier.includes('local'));
+        
+        // 4. Ultimate fallback: Any British voice
         if (!bestVoice) bestVoice = voices.find(v => v.language.includes('en-GB'));
-        if (!bestVoice) bestVoice = voices.find(v => v.language.includes('en-US') && v.identifier.includes('network'));
+        
         if (bestVoice) setVoiceId(bestVoice.identifier);
       } catch (e) {
         console.log("Error loading voices");
       }
+      setIsVoiceReady(true);
     };
     getVoices();
 
@@ -551,12 +625,14 @@ export default function ModuleScreen() {
   };
 
   // --- SPEECH HELPER ---
-  const playAudioFromUrl = async (url: string, onComplete?: () => void) => {
+  const playAudioFromUrl = async (url: string, onComplete?: () => void, preserveMode: boolean = false) => {
     try {
       await Speech.stop();
       if (sound) await sound.unloadAsync();
 
-      setMode('PLAYING_AUDIO');
+      if (!preserveMode) {
+          setMode('PLAYING_AUDIO');
+      }
 
       // 1. Load sound but DO NOT play yet (shouldPlay: false)
       const { sound: newSound } = await Audio.Sound.createAsync(
@@ -578,11 +654,16 @@ export default function ModuleScreen() {
           if (onComplete) onComplete();
           newSound.unloadAsync(); 
           setSound(null);
+          if (!preserveMode && mode === 'PLAYING_AUDIO') {
+              setMode('IDLE');
+          }
         }
       });
     } catch (error) {
       console.log("Error playing audio URL:", error);
-      setMode('IDLE');
+      if (!preserveMode) {
+          setMode('IDLE');
+      }
     }
   };
 
@@ -591,9 +672,20 @@ export default function ModuleScreen() {
       if (sound) sound.unloadAsync();
     };
   }, [sound]);
+
+  // Clean up any active recording on unmount or before starting a new one
+  useEffect(() => {
+    return () => {
+      if (recording) {
+        recording.stopAndUnloadAsync().catch((e) => console.log("Silent unload catch:", e));
+      }
+    };
+  }, [recording]);
+
   const speakText = (text: string, onDone?: () => void, rate: number = 0.9) => {
+    if (!isVoiceReady) return; // Prevent fallback to generic voice while OS voice list loads
+    Speech.stop(); // Force reset the TTS engine state
     const options: Speech.SpeechOptions = { 
-      language: 'en-GB', 
       pitch: 1.0, 
       rate: rate, 
       onDone: onDone, 
@@ -604,8 +696,39 @@ export default function ModuleScreen() {
         if(mode === 'PLAYING_AUDIO') setMode('IDLE'); 
       } 
     };
-    if (voiceId) options.voice = voiceId;
+    if (voiceId) {
+      options.voice = voiceId;
+    } else {
+      // Only set language if we completely failed to find a British voice earlier
+      options.language = 'en-GB';
+    }
     Speech.speak(text, options);
+  };
+
+  const playHeatmapWord = (text: string) => {
+      // Clean the word and allow hyphens/apostrophes (e.g., "don't").
+      if (!text || typeof text !== 'string') return;
+      const cleanWord = text.replace(/[^a-zA-Z'-]/g, '').trim();
+      if (!cleanWord) return;
+      
+      // Providing the word explicitly without extra grammar or casing that might trigger NLP errors
+      speakText(cleanWord, undefined, 0.9);
+  };
+
+  const playFullAITranscript = async (text: string) => {
+      if (isGeneratingTTS) return;
+      setIsGeneratingTTS(true);
+      try {
+          // Play the whole sentence through high quality cloud TTS
+          const uri = await synthesizeSpeech(text);
+          if (uri) {
+              playAudioFromUrl(uri, () => setIsGeneratingTTS(false), true);
+          } else {
+              speakText(text, () => setIsGeneratingTTS(false), 0.9);
+          }
+      } catch (e) {
+          setIsGeneratingTTS(false);
+      }
   };
 
   function stopTimer() { 
@@ -922,10 +1045,10 @@ export default function ModuleScreen() {
 
           if (res.userTranscript) setUserSummary(res.userTranscript);
           
-          let pts = res.overall > 50 ? 1 : 0;
+          let pts = res.overall >= 50 ? 1 : 0;
           
           if (isASQ) {
-              pts = res.content > 60 ? 1 : 0; 
+              pts = res.content >= 50 ? 1 : 0; 
               setResult(res);
               setAsqResultPopup(true);
               setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
@@ -1003,9 +1126,9 @@ export default function ModuleScreen() {
     }));
 
     // 5. Standard result handling
-    let ptsForSession = res.overall > 50 ? 1 : 0;
+    let ptsForSession = res.overall >= 50 ? 1 : 0;
     if (isASQ) {
-      ptsForSession = res.content > 60 ? 1 : 0;
+      ptsForSession = res.content >= 50 ? 1 : 0;
       setResult(res);
       setAsqResultPopup(true);
     } else {
@@ -1077,7 +1200,7 @@ export default function ModuleScreen() {
       }
 
       setResult(res);
-      const isCorrect = res.overall > 50;
+      const isCorrect = res.overall >= 50;
       setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
       awardPointIfFirstAttempt(isCorrect);
       setMode('RESULT');
@@ -1104,7 +1227,7 @@ export default function ModuleScreen() {
       }
 
       setResult(res);
-      const isCorrect = res.overall > 50;
+      const isCorrect = res.overall >= 50;
       setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
       awardPointIfFirstAttempt(isCorrect);
       setMode('RESULT');
@@ -1336,7 +1459,7 @@ export default function ModuleScreen() {
     (mcResult && mcResult.score < mcResult.max) ||
     (dictationResult && dictationResult.score < dictationResult.max) ||
     (highlightResult && highlightResult.score < highlightResult.max) ||
-    (result && (isASQ ? result.content < 60 : result.overall < 70))
+    (result && (isASQ ? result.content < 50 : result.overall < 50))
   );
 
   const renderItem = ({ item, index }: { item: any, index: number }) => (
@@ -1409,7 +1532,7 @@ export default function ModuleScreen() {
             <View style={[{justifyContent:'center', alignItems:'center'}, mode !== 'RESULT' ? {flex: 1} : {minHeight: 80}]}>
                 {mode === 'IDLE' && (
                   <View style={{width: '100%', marginBottom: 20}}>
-                    <AudioControlBar onPlay={startASQSequence} isPlaying={false} label="Play Audio" />
+                    {AudioControlBar({ onPlay: startASQSequence, isPlaying: false, label: "Play Audio" })}
                   </View>
                 )}
                 <MaterialCommunityIcons name="comment-question-outline" size={80} color={mode === 'RECORDING' ? '#EF4444' : '#2563EB'} />
@@ -1453,9 +1576,7 @@ export default function ModuleScreen() {
                )}
 
                {/* Audio Controls (Only show when NOT in Result mode) */}
-               {mode !== 'RESULT' && (
-                  <AudioControlBar onPlay={mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayAudio} isPlaying={mode === 'PLAYING_AUDIO'} />
-               )}
+               {mode !== 'RESULT' && AudioControlBar({ onPlay: mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayAudio, isPlaying: mode === 'PLAYING_AUDIO' })}
             </View>
           )}
         {isDescribeImage && ( 
@@ -1514,51 +1635,73 @@ export default function ModuleScreen() {
           <View style={{flex: 1}}>
             <Text style={styles.reOrderTitle}>{item.title}</Text>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fibContainer}>
-              <View style={styles.fibTextWrapper}>
-                {item.segments.map((segment: string, i: number) => (
-                  <Text key={`seg-${i}`} style={styles.fibText}>
-                    {segment}
-                    {i < item.segments.length - 1 && (
-                      <Text 
-                        onPress={() => !fillBlankScore && setActiveBlankIndex(i)} 
-                        style={[
-                          styles.blankBox, 
-                          blankAnswers[i] ? styles.blankFilled : null, 
-                          fillBlankScore ? (blankAnswers[i] === item.correctAnswers[i] ? styles.blankCorrect : styles.blankWrong) : null
-                        ]}
-                      >
-                        {fillBlankScore ? (blankAnswers[i] === item.correctAnswers[i] ? ` ${blankAnswers[i]} ` : ` ${blankAnswers[i] || '___'} `) : (blankAnswers[i] ? ` ${blankAnswers[i]} ` : " ____ ")}
-                      </Text>
-                    )}
-                  </Text>
-                ))}
+              <View style={[styles.fibTextWrapper, { paddingHorizontal: 4 }]}>
+                {item.segments.map((segment: string, i: number) => {
+                  const words = segment.split(/(\s+)/);
+                  return (
+                    <React.Fragment key={`frag-${i}`}>
+                      {words.map((word, wIdx) => (
+                        <Text key={`word-${i}-${wIdx}`} style={styles.fibText}>
+                          {word}
+                        </Text>
+                      ))}
+                      {i < item.segments.length - 1 && (
+                        <TouchableOpacity 
+                          onPress={() => !fillBlankScore && setActiveBlankIndex(i)} 
+                          style={[
+                            styles.blankBox, 
+                            blankAnswers[i] ? styles.blankFilled : null, 
+                            fillBlankScore ? (blankAnswers[i] === item.correctAnswers[i] ? styles.blankCorrect : styles.blankWrong) : null,
+                            { marginVertical: 5 }
+                          ]}
+                        >
+                          <Text style={[
+                            { color: '#2563EB', fontWeight: 'bold' },
+                            blankAnswers[i] ? { color: '#fff' } : null,
+                            fillBlankScore ? { color: '#fff' } : null
+                          ]}>
+                            {fillBlankScore ? (blankAnswers[i] === item.correctAnswers[i] ? `${blankAnswers[i]}` : `${blankAnswers[i] || '___'}`) : (blankAnswers[i] ? `${blankAnswers[i]}` : " ____ ")}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </View>
             </ScrollView>
           </View> 
         )}
         {isFillBlanksRW && (
           <View style={{flex: 1}}>
-            <ScrollView style={{flex: 1}}>
-              <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10}}>
-                {item.segments.map((segment: string, i: number) => (
-                  <Text key={`seg-${i}`} style={styles.fibText}>
-                    {segment}
-                    {i < item.segments.length - 1 && (
-                      <TouchableOpacity 
-                        style={[
-                          styles.inlineInput, 
-                          activeRwBlankIndex === i && { borderColor: '#2563EB', borderWidth: 2, backgroundColor: '#DBEAFE' },
-                          rwResult ? (rwAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i].toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
-                        ]} 
-                        onPress={() => !rwResult && setActiveRwBlankIndex(i)}
-                      >
-                        <Text style={{ fontSize: 16, color: rwAnswers[i] ? '#1E293B' : '#94A3B8', fontWeight: rwAnswers[i] ? '600' : '400' }}>
-                          {rwResult && rwAnswers[i]?.trim().toLowerCase() !== item.correctAnswers[i].toLowerCase() ? `${rwAnswers[i] || '___'}` : (rwAnswers[i] || `(${i+1})`)}
+            <ScrollView style={{flex: 1}} keyboardShouldPersistTaps="handled">
+              <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, paddingHorizontal: 4}}>
+                {item.segments.map((segment: string, i: number) => {
+                  const words = segment.split(/(\s+)/);
+                  return (
+                    <React.Fragment key={`frag-${i}`}>
+                      {words.map((word, wIdx) => (
+                        <Text key={`word-${i}-${wIdx}`} style={styles.fibText}>
+                          {word}
                         </Text>
-                      </TouchableOpacity>
-                    )}
-                  </Text>
-                ))}
+                      ))}
+                      {i < item.segments.length - 1 && (
+                        <TouchableOpacity 
+                          style={[
+                            styles.inlineInput, 
+                            { minWidth: 100, height: 40, marginVertical: 5 },
+                            activeRwBlankIndex === i && { borderColor: '#2563EB', borderWidth: 2, backgroundColor: '#DBEAFE' },
+                            rwResult ? (rwAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i].toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
+                          ]} 
+                          onPress={() => !rwResult && setActiveRwBlankIndex(i)}
+                        >
+                          <Text style={{ fontSize: 16, color: rwAnswers[i] ? (rwResult ? '#fff' : '#1E293B') : '#94A3B8', fontWeight: rwAnswers[i] ? '600' : '400' }}>
+                            {rwResult && rwAnswers[i]?.trim().toLowerCase() !== item.correctAnswers[i].toLowerCase() ? `${rwAnswers[i] || '___'}` : (rwAnswers[i] || `(${i+1})`)}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </View>
             </ScrollView>
           </View>
@@ -1567,38 +1710,13 @@ export default function ModuleScreen() {
           <View style={{flex: 1}}>
             {mode !== 'RESULT' ? (
               <>
-                <AudioControlBar onPlay={mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayLFibAudio} isPlaying={mode === 'PLAYING_AUDIO'} />
-
-                <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom: 40}}>
-                  <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 12}}>
-                    {item.segments.map((segment: string, i: number) => {
-                      const words = segment.split(' ');
-                      return (
-                        <View key={i} style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center'}}>
-                          {words.map((word, wIndex) => (
-                             word.length > 0 ? ( <Text key={`${i}-${wIndex}`} style={styles.fibText}>{word}{wIndex < words.length - 1 ? ' ' : ''}</Text> ) : null
-                          ))}
-                          {i < item.segments.length - 1 && (
-                            <View style={{flexDirection: 'column', alignSelf: 'center'}}>
-                              <TextInput 
-                                style={[
-                                  styles.inlineInput, 
-                                  { width: Math.max(130, (lFibAnswers[i]?.length || 0) * 12 + 30) },
-                                  lFibResult ? lFibAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong : null
-                                ]} 
-                                placeholder="" 
-                                value={lFibAnswers[i]} 
-                                onChangeText={(text) => handleLFibChange(text, i)} 
-                                editable={!lFibResult} 
-                                autoCapitalize="none" 
-                              />
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
+                <ListeningFillBlanksContent 
+                    item={item} 
+                    lFibAnswers={lFibAnswers} 
+                    lFibResult={lFibResult} 
+                    handleLFibChange={handleLFibChange} 
+                    styles={styles}
+                />
               </>
             ) : (
               <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
@@ -1613,7 +1731,7 @@ export default function ModuleScreen() {
           <View style={{ flex: 1 }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{paddingBottom: 50}}>
               {/* Audio Control Bar */}
-              <AudioControlBar onPlay={handlePlayHighlight} isPlaying={mode === 'PLAYING_AUDIO'} />
+              {AudioControlBar({ onPlay: handlePlayHighlight, isPlaying: mode === 'PLAYING_AUDIO' })}
 
               {/* Text Area */}
               <View style={styles.highlightContainer}>
@@ -1669,11 +1787,11 @@ export default function ModuleScreen() {
                 {/* 1. SHOW AUDIO PLAYER FOR LISTENING TASKS ONLY */}
                 {(activeType === 'multiple-choice-l-multi' || activeType === 'multiple-choice-l-single' || isHighlightCorrectSummary || isSelectMissingWord) && (
                     <View style={{marginBottom: 20}}>
-                      <AudioControlBar 
-                        onPlay={mode === 'PLAYING_AUDIO' ? handleStopAudio : startListeningMC} 
-                        isPlaying={mode === 'PLAYING_AUDIO'} 
-                        label={mode === 'PREP_LISTENING' ? `Prepare: ${timeLeft}s` : "Play Audio"}
-                      />
+                      {AudioControlBar({ 
+                        onPlay: mode === 'PLAYING_AUDIO' ? handleStopAudio : startListeningMC, 
+                        isPlaying: mode === 'PLAYING_AUDIO', 
+                        label: mode === 'PREP_LISTENING' ? `Prepare: ${timeLeft}s` : "Play Audio"
+                      })}
                     </View>
                 )}
 
@@ -1758,21 +1876,18 @@ export default function ModuleScreen() {
 
               {(mode === 'IDLE' || mode === 'PLAYING_AUDIO') && (
                 <View style={{width: '100%', marginTop: 20}}>
-                  <AudioControlBar onPlay={mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayLecture} isPlaying={mode === 'PLAYING_AUDIO'} />
+                  {AudioControlBar({ onPlay: mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayLecture, isPlaying: mode === 'PLAYING_AUDIO' })}
                 </View>
               )}
             </View>
-            {/* Only show the transcript box for AI modules, not Re-order/MC */}
-            {mode === 'RESULT' && userSummary && !reOrderScore && !mcResult && (
-              <ScrollView style={{width:'100%', flex: 1, backgroundColor:'#F1F5F9', padding:10, borderRadius:8, marginBottom:20}}>
-                <Text style={{fontWeight:'bold', marginBottom:5}}>Your Transcript:</Text>
-                <Text>{userSummary}</Text>
-              </ScrollView>
-            )}
           </View>
         )}
         {(isSummarizeSpoken || isWriteDictation || isSummarizeWritten) && ( 
-          <View style={{flex: 1}}>
+          <ScrollView 
+            style={{flex: 1}} 
+            contentContainerStyle={{ paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
             {isSummarizeWritten && (
               <View style={{marginBottom: 10}}>
                 <Text style={styles.reOrderTitle}>{item.title}</Text>
@@ -1780,18 +1895,18 @@ export default function ModuleScreen() {
               </View>
             )}
             {isSummarizeSpoken && (
-              <AudioControlBar onPlay={handlePlayAudio} isPlaying={isSummarizePlaying} />
+              AudioControlBar({ onPlay: handlePlayAudio, isPlaying: isSummarizePlaying })
             )}
             {isWriteDictation && (
-              <AudioControlBar 
-                onPlay={handlePlayDictation} 
-                isPlaying={mode === 'PLAYING_AUDIO'} 
-                label={dictationPlayed ? "Already Played" : "Play Sentence"}
-                disabled={dictationPlayed}
-              />
+              AudioControlBar({ 
+                onPlay: handlePlayDictation, 
+                isPlaying: mode === 'PLAYING_AUDIO', 
+                label: dictationPlayed ? "Already Played" : "Play Sentence",
+                disabled: dictationPlayed,
+              })
             )}
             <Text style={styles.label}>{isWriteDictation ? "Type exactly what you heard:" : "Your Answer (5-75 words):"}</Text>
-            <TextInput style={[styles.summaryInput, { maxHeight: isKeyboardVisible ? 120 : 200 }]} multiline placeholder={isWriteDictation ? "Type here..." : "Type your answer here..."} value={userSummary} onChangeText={isWriteDictation ? setUserSummary : handleSummaryChange} editable={mode !== 'RESULT' && mode !== 'PROCESSING' && !dictationResult} />
+            <TextInput style={[styles.summaryInput, { maxHeight: isKeyboardVisible ? 140 : 200 }]} multiline placeholder={isWriteDictation ? "Type here..." : "Type your answer here..."} value={userSummary} onChangeText={isWriteDictation ? setUserSummary : handleSummaryChange} editable={mode !== 'RESULT' && mode !== 'PROCESSING' && !dictationResult} />
             {(isSummarizeSpoken || isSummarizeWritten) && (
               <View style={styles.wordCountRow}><Text style={[styles.wordCountText, (wordCount < 5 || wordCount > 75) ? {color: '#EF4444'} : {color: '#10B981'}]}>Words: {wordCount}</Text></View>
             )}
@@ -1803,7 +1918,7 @@ export default function ModuleScreen() {
                 <Text style={styles.btnText}>Submit Answer</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </ScrollView>
         )}
         {isEssay && (
           <View style={{flex: 1}}>
@@ -1824,7 +1939,7 @@ export default function ModuleScreen() {
           {((isSummarizeGroup || isRespondSituation) && mode !== 'RESULT') && (
              <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom:50}}>
                <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10}}>
-                 {mode === 'IDLE' && <PlaybackSpeedToggle />}
+                 {mode === 'IDLE' && PlaybackSpeedToggle()}
                </View>
                
                {/* 1. TEXT DISPLAYS (Hidden until Start is pressed!) */}
@@ -2170,24 +2285,33 @@ export default function ModuleScreen() {
         <View style={styles.headerRight} />
       </View>
 
-<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+
+      {/* Audio controls moved out of the task flow */}
+      {isFillBlanksListening && mode !== 'RESULT' && (
+        <View style={{ paddingHorizontal: 15, paddingTop: 10 }}>
+            {AudioControlBar({ onPlay: mode === 'PLAYING_AUDIO' ? handleStopAudio : handlePlayLFibAudio, isPlaying: mode === 'PLAYING_AUDIO' })}
+        </View>
+      )}
+
       <View style={[styles.carouselContainer, { flex: 1 }]}>
         {/* Render only the CURRENT question. No FlatList, no memory bugs! */}
         {questions.length > 0 && renderItem({ item: questions[currentIndex], index: currentIndex })}
       </View>
 
-      <View style={styles.jumpToContainer}>
-        <Text style={styles.jumpToLabel}>JUMP TO:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.jumpToScroll}>
-          {questions.map((_, index) => (
-            <TouchableOpacity key={index} style={[styles.jumpCircle, currentIndex === index && styles.jumpCircleActive]} onPress={() => scrollToQuestion(index)}>
-              <Text style={[styles.jumpCircleText, currentIndex === index && styles.jumpCircleTextActive]}>{index + 1}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {!isKeyboardVisible && (
+        <View style={styles.jumpToContainer}>
+          <Text style={styles.jumpToLabel}>JUMP TO:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.jumpToScroll}>
+            {questions.map((_, index) => (
+              <TouchableOpacity key={index} style={[styles.jumpCircle, currentIndex === index && styles.jumpCircleActive]} onPress={() => scrollToQuestion(index)}>
+                <Text style={[styles.jumpCircleText, currentIndex === index && styles.jumpCircleTextActive]}>{index + 1}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
-        {((!isSummarizeGroup && !isRespondSituation) || mode === 'RESULT') && (
+        {((!isSummarizeGroup && !isRespondSituation && !isKeyboardVisible) || mode === 'RESULT') && (
           <View style={[
             styles.controls, 
             mode === 'RESULT' && { flex: 1 },
@@ -2203,26 +2327,26 @@ export default function ModuleScreen() {
              
              {/* MAIN RESULTS BOX (Speaking/Writing) */}
              {(mode === 'RESULT' && result && !isASQ) && (
-               <View style={[styles.resultBox, { flex: 1, paddingBottom: 0, overflow: 'hidden' }, result.overall < 70 && { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
+               <View style={[styles.resultBox, { flex: 1, paddingBottom: 0, overflow: 'hidden' }, result.overall < 50 && { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
                   <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 15, paddingBottom: 10 }}>
-                      <Text style={[styles.resultTitle, result.overall < 70 && { color: '#DC2626' }]}>Score: {result.overall}/90</Text>
+                      <Text style={[styles.resultTitle, result.overall < 50 && { color: '#DC2626' }]}>Score: {result.overall}/90</Text>
                       
-                      <View style={{ backgroundColor: result.overall < 70 ? '#FEE2E2' : '#EFF6FF', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center', borderWidth: 1, borderColor: result.overall < 70 ? '#FECACA' : '#BFDBFE' }}>
-                          <Text style={{ color: result.overall < 70 ? '#DC2626' : '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
+                      <View style={{ backgroundColor: result.overall < 50 ? '#FEE2E2' : '#EFF6FF', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center', borderWidth: 1, borderColor: result.overall < 50 ? '#FECACA' : '#BFDBFE' }}>
+                          <Text style={{ color: result.overall < 50 ? '#DC2626' : '#2563EB', fontWeight: 'bold', fontSize: 14 }}>
                              Session Progress: {currentSessionScore.toFixed(0)} / {questions.length} Correct
                           </Text>
                       </View>
                       
                       <View style={{marginBottom: 15}}>
                           {result.breakdown && Object.entries(result.breakdown).map(([k,v]:any) => {
-                             if (k.toLowerCase() === 'pronunciation' && result.overall < 70) return null;
-                             return <FeedbackRow key={k} label={k.toUpperCase()} text={v.toString()} isIncorrect={result.overall < 70} />;
+                             if (k.toLowerCase() === 'pronunciation' && result.overall < 50) return null;
+                             return <FeedbackRow key={k} label={k.toUpperCase()} text={v.toString()} isIncorrect={result.overall < 50} />;
                           })}
                       </View>
                       
-                      <View style={{backgroundColor: result.overall < 70 ? '#FFF5F5' : '#F0FDF4', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: result.overall < 70 ? '#EF4444' : '#059669', marginBottom: 15}}>
-                          <Text style={{fontWeight: 'bold', color: result.overall < 70 ? '#991B1B' : '#065F46', marginBottom: 5}}>Reason for Score:</Text>
-                          <Text style={{color: result.overall < 70 ? '#7F1D1D' : '#064E3B', lineHeight: 22}}>{result.feedback}</Text>
+                      <View style={{backgroundColor: result.overall < 50 ? '#FFF5F5' : '#F0FDF4', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: result.overall < 50 ? '#EF4444' : '#059669', marginBottom: 15}}>
+                          <Text style={{fontWeight: 'bold', color: result.overall < 50 ? '#991B1B' : '#065F46', marginBottom: 5}}>Reason for Score:</Text>
+                          <Text style={{color: result.overall < 50 ? '#7F1D1D' : '#064E3B', lineHeight: 22}}>{result.feedback}</Text>
                       </View>
 
                       <View style={{ alignItems: 'center', paddingVertical: 10 }}>
@@ -2230,16 +2354,58 @@ export default function ModuleScreen() {
                           <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: 'bold' }}>SCROLL FOR MORE FEEDBACK</Text>
                       </View>
 
-                      {result.mistakes && result.mistakes.length > 0 && (
-                        <View style={{backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#EF4444', marginBottom: 15}}>
-                            <Text style={{fontWeight: 'bold', color: '#991B1B', marginBottom: 5}}>Word-Level Feedback:</Text>
-                            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-                                {result.mistakes.map((m: any, i: number) => (
-                                    <View key={i} style={{backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#FEE2E2'}}>
-                                        <Text style={{fontSize: 12, color: '#1E293B'}}><Text style={{fontWeight: 'bold'}}>{m.word}</Text> ({m.label})</Text>
-                                    </View>
-                                ))}
+                      {result.wordAnalysis && result.wordAnalysis.length > 0 && (
+                        <View style={{backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0'}}>
+                            <Text style={{fontWeight: 'bold', color: '#334155', marginBottom: 5}}>Pronunciation Heatmap (Tap word to listen):</Text>
+                            <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center'}}>
+                                {result.wordAnalysis.map((item: any, i: number) => {
+                                    const isBad = item.health === 'bad';
+                                    return (
+                                        <TouchableOpacity 
+                                          key={i} 
+                                          onPress={() => playHeatmapWord(item.word)}
+                                          style={{ margin: 2, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, backgroundColor: isBad ? '#FECACA' : 'transparent' }}
+                                        >
+                                          <Text style={{ 
+                                            fontSize: 16, 
+                                            color: isBad ? '#991B1B' : '#059669',
+                                            textDecorationLine: isBad ? 'underline' : 'none'
+                                          }}>
+                                            {item.word}
+                                          </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
+                            
+                            <TouchableOpacity 
+                              onPress={() => {
+                                  const targetText = currentItem.transcript || currentItem.text || currentItem.situation || currentItem.title || "";
+                                  playFullAITranscript(targetText);
+                              }}
+                              style={{marginTop: 15, backgroundColor: isGeneratingTTS ? '#E2E8F0' : '#DBEAFE', padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}
+                            >
+                              <MaterialCommunityIcons name="music-clef-treble" size={18} color={isGeneratingTTS ? '#64748B' : '#2563EB'} style={{marginRight: 6}} />
+                              <Text style={{color: isGeneratingTTS ? '#64748B' : '#1D4ED8', fontWeight: 'bold', fontSize: 13}}>
+                                {isGeneratingTTS ? 'Generating Perfect AI Audio...' : 'Play Perfect AI Pronunciation'}
+                              </Text>
+                            </TouchableOpacity>
+                            
+                        </View>
+                      )}
+
+                      {result?.wordAnalysis && result.wordAnalysis.some((w: any) => w.health === 'bad') && (
+                        <View style={{backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#FECACA'}}>
+                            <Text style={{fontWeight: 'bold', color: '#991B1B', marginBottom: 8}}>Missed / Mispronounced Words:</Text>
+                            {result.wordAnalysis.filter((w: any) => w.health === 'bad').map((item: any, idx: number) => (
+                                <TouchableOpacity key={idx} style={{flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6}} onPress={() => playHeatmapWord(item.word)}>
+                                    <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" style={{marginRight: 6, marginTop: 2}} />
+                                    <View style={{flex: 1}}>
+                                        <Text style={{color: '#7F1D1D', fontWeight: 'bold', fontSize: 15}}>{item.word}</Text>
+                                        {item.label && <Text style={{color: '#991B1B', fontSize: 13, marginTop: 2}}>{item.label}</Text>}
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                       )}
 
@@ -2255,20 +2421,20 @@ export default function ModuleScreen() {
                         </View>
                       )}
 
-                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture || isRespondSituation) && result.overall >= 70 && (
+                      {(isEssay || isDescribeImage || isSummarizeSpoken || isSummarizeWritten || isRetellLecture || isRespondSituation) && result.overall >= 50 && (
                          <TouchableOpacity style={{marginTop: 20, alignSelf: 'center'}} onPress={() => setShowModelAnswer(true)}>
                             <Text style={{color: '#2563EB', fontWeight:'bold', textDecorationLine: 'underline'}}>View Top Scoring Answer</Text>
                          </TouchableOpacity>
                       )}
                   </ScrollView>
-                  <View style={{ width: '100%', padding: 8, borderTopWidth: 1, borderColor: result.overall < 70 ? '#FECACA' : '#D1FAE5', backgroundColor: result.overall < 70 ? '#FEF2F2' : '#ECFDF5', gap: 6 }}>
-                      {result.overall < 70 && (
+                  <View style={{ width: '100%', padding: 8, borderTopWidth: 1, borderColor: result.overall < 50 ? '#FECACA' : '#D1FAE5', backgroundColor: result.overall < 50 ? '#FEF2F2' : '#ECFDF5', gap: 6 }}>
+                      {result.overall < 50 && (
                         <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                            <Text style={styles.btnTextSmall}>Try Again</Text>
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                         <Text style={styles.btnTextSmall}>{result.overall < 70 ? 'Skip to Next' : 'Next Question'}</Text>
+                         <Text style={styles.btnTextSmall}>{result.overall < 50 ? 'Skip to Next' : 'Next Question'}</Text>
                          <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" style={{ position: 'absolute', right: 12 }} />
                       </TouchableOpacity>
                   </View>
@@ -2442,26 +2608,35 @@ export default function ModuleScreen() {
                       <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
                         <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Results & Feedback:</Text>
                         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 12}}>
-                          {currentItem.segments.map((segment: string, i: number) => {
-                            const words = segment.split(' ');
-                            return (
-                              <View key={i} style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center'}}>
-                                {words.map((word, wIndex) => (
-                                   word.length > 0 ? ( <Text key={`${i}-${wIndex}`} style={[styles.fibText, {fontSize: 14}]}>{word}{wIndex < words.length - 1 ? ' ' : ''}</Text> ) : null
-                                ))}
-                                {i < currentItem.segments.length - 1 && (
-                                  <View style={[
-                                    styles.inlineInput, 
-                                    { width: 'auto', minWidth: 60, paddingHorizontal: 8, height: 30, justifyContent: 'center' },
-                                    lFibAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong
-                                  ]}>
-                                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: lFibAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i]?.toLowerCase() ? '#065F46' : '#991B1B' }}>
-                                      {lFibAnswers[i] || '___'}
-                                    </Text>
-                                  </View>
+                          {currentItem.segments.flatMap((segment: string, i: number) => {
+                            const words = segment.replace(/\s+/g, ' ').trim().split(' ');
+                            
+                            const wordNodes = words.map((word, wIndex) => (
+                              word.length > 0 ? (
+                                <Text key={`res-text-${i}-${wIndex}`} style={[styles.fibText, {fontSize: 14, marginVertical: 2, marginRight: 4}]}>
+                                  {word}
+                                </Text>
+                              ) : null
+                            ));
+
+                            const answerNode = i < currentItem.segments.length - 1 ? (
+                              <View key={`res-ans-${i}`} style={{marginHorizontal: 4, marginVertical: 2, alignItems: 'center'}}>
+                                <View style={[
+                                  styles.inlineInput, 
+                                  { width: 'auto', minWidth: 60, paddingHorizontal: 8, height: 30, justifyContent: 'center' },
+                                  lFibAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong
+                                ]}>
+                                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: lFibAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i]?.toLowerCase() ? '#065F46' : '#991B1B' }}>
+                                    {lFibAnswers[i] || '___'}
+                                  </Text>
+                                </View>
+                                {lFibAnswers[i]?.trim().toLowerCase() !== currentItem.correctAnswers[i]?.toLowerCase() && (
+                                  <Text style={{color: '#059669', fontSize: 12, fontWeight: 'bold', marginTop: 2}}>{currentItem.correctAnswers[i]}</Text>
                                 )}
                               </View>
-                            );
+                            ) : null;
+                            
+                            return [...wordNodes, answerNode];
                           })}
                         </View>
                       </View>
@@ -2606,10 +2781,30 @@ export default function ModuleScreen() {
 
           </View>
         )}
-      </KeyboardAvoidingView>
 
       {/* MODALS AND ZOOM */}
-      <Modal animationType="slide" transparent={true} visible={showModelAnswer} onRequestClose={() => setShowModelAnswer(false)}><View style={styles.modalOverlay}><View style={styles.modalContent}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Model Answer</Text><TouchableOpacity onPress={() => setShowModelAnswer(false)}><MaterialCommunityIcons name="close-circle" size={30} color="#64748B" /></TouchableOpacity></View><ScrollView style={{maxHeight: 300}}><Text style={styles.modelText}>{questions[currentIndex]?.modelAnswer || "No model answer available."}</Text></ScrollView></View></View></Modal>
+      <Modal 
+        animationType="slide" 
+        transparent={true} 
+        visible={showModelAnswer} 
+        onRequestClose={() => setShowModelAnswer(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Model Answer</Text>
+              <TouchableOpacity onPress={() => setShowModelAnswer(false)}>
+                <MaterialCommunityIcons name="close-circle" size={30} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{maxHeight: 300}}>
+              <Text style={styles.modelText}>
+                {questions[currentIndex]?.modelAnswer || "No model answer available."}
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={isImageViewVisible} transparent={true} animationType="fade" onRequestClose={() => setIsImageViewVisible(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
           <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 10 }} onPress={() => setIsImageViewVisible(false)}>
