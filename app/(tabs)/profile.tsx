@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { scoreService, PerformanceMetrics } from '../../services/scoreService';
+import { scoreService, PerformanceMetrics } from '@/services/scoreService';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function Profile() {
   const [userName, setUserName] = useState('PTE Student');
@@ -16,6 +17,7 @@ export default function Profile() {
 
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [newTarget, setNewTarget] = useState('');
+  const { colors, isDark } = useTheme();
 
   useFocusEffect(
     useCallback(() => {
@@ -52,90 +54,127 @@ export default function Profile() {
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.header}>My Profile</Text>
+  const dynamicStyles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    scroll: { padding: 20 },
+    header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.text },
+    
+    profileCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 30, alignItems: 'center', marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
+    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.border, marginBottom: 16, overflow: 'hidden' },
+    name: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    targetWrapper: { marginTop: 4, padding: 4 },
+    target: { color: colors.subtext, fontWeight: '500' },
+  
+    statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
+    statCard: { backgroundColor: colors.surface, width: '48%', padding: 20, borderRadius: 16, alignItems: 'center', shadowOpacity: 0.05, shadowRadius: 5 },
+    statNum: { fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 },
+    statNumGreen: { fontSize: 24, fontWeight: 'bold', color: colors.success, marginBottom: 4 },
+    statLabel: { fontSize: 12, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 1 },
+  
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, color: colors.text },
+    progressCard: { backgroundColor: colors.surface, padding: 20, borderRadius: 16, marginBottom: 12 },
+    progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    skillName: { fontWeight: '600', color: colors.text },
+    skillVal: { fontWeight: 'bold', color: colors.primary },
+    barBg: { height: 8, backgroundColor: isDark ? colors.border : '#F1F5F9', borderRadius: 4 },
+    barFill: { height: '100%', borderRadius: 4 },
+    
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+    modalContent: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, alignItems: 'center' },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
+    modalSubtitle: { fontSize: 14, color: colors.subtext, marginBottom: 20, textAlign: 'center' },
+    modalInput: { width: 100, height: 60, backgroundColor: isDark ? colors.border : '#F1F5F9', borderRadius: 12, fontSize: 32, fontWeight: 'bold', textAlign: 'center', color: colors.text, marginBottom: 24 },
+    modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
+    modalCancel: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', marginRight: 8, backgroundColor: isDark ? colors.border : '#F1F5F9' },
+    modalCancelText: { color: colors.subtext, fontWeight: 'bold', fontSize: 16 },
+    modalSave: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', marginLeft: 8, backgroundColor: colors.primary },
+    modalSaveText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  });
 
+  return (
+    <SafeAreaView style={dynamicStyles.container}>
+      <ScrollView contentContainerStyle={dynamicStyles.scroll}>
+        <Text style={dynamicStyles.header}>My Profile</Text>
+  
         {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <Image source={require('../../assets/images/BBLPTF.png')} style={styles.avatar} />
-          <Text style={styles.name}>{userName}</Text>
-          <TouchableOpacity onPress={handleTargetScoreTap} style={styles.targetWrapper}>
-            <Text style={styles.target}>Target Score: {targetScore} <MaterialCommunityIcons name="pencil" size={14} color="#64748B" /></Text>
+        <View style={dynamicStyles.profileCard}>
+          <Image source={require('../../assets/images/BBLPTF.png')} style={dynamicStyles.avatar} />
+          <Text style={dynamicStyles.name}>{userName}</Text>
+          <TouchableOpacity onPress={handleTargetScoreTap} style={dynamicStyles.targetWrapper}>
+            <Text style={dynamicStyles.target}>Target Score: {targetScore} <MaterialCommunityIcons name="pencil" size={14} color={colors.subtext} /></Text>
           </TouchableOpacity>
         </View>
-
+  
         {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNum}>{attemptedCount}</Text>
-            <Text style={styles.statLabel}>EXERCISES</Text>
+        <View style={dynamicStyles.statsRow}>
+          <View style={dynamicStyles.statCard}>
+            <Text style={dynamicStyles.statNum}>{attemptedCount}</Text>
+            <Text style={dynamicStyles.statLabel}>EXERCISES</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumGreen}>{score}</Text>
-            <Text style={styles.statLabel}>TOTAL SCORE</Text>
+          <View style={dynamicStyles.statCard}>
+            <Text style={dynamicStyles.statNumGreen}>{score}</Text>
+            <Text style={dynamicStyles.statLabel}>TOTAL SCORE</Text>
           </View>
         </View>
-
+  
         {/* Progress Bars */}
-        <Text style={styles.sectionTitle}>Learning Progress</Text>
+        <Text style={dynamicStyles.sectionTitle}>Learning Progress</Text>
         
         {performance && (
           <>
-            <View style={styles.progressCard}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.skillName}>Vocabulary Expansion</Text>
-                <Text style={styles.skillVal}>{Math.round(performance.vocabulary)}%</Text>
+            <View style={dynamicStyles.progressCard}>
+              <View style={dynamicStyles.progressHeader}>
+                <Text style={dynamicStyles.skillName}>Vocabulary Expansion</Text>
+                <Text style={dynamicStyles.skillVal}>{Math.round(performance.vocabulary)}%</Text>
               </View>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${Math.round(performance.vocabulary)}%`, backgroundColor: '#2563EB' }]} />
-              </View>
-            </View>
-
-            <View style={styles.progressCard}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.skillName}>Grammar Accuracy</Text>
-                <Text style={styles.skillVal}>{Math.round(performance.grammar)}%</Text>
-              </View>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${Math.round(performance.grammar)}%`, backgroundColor: '#F97316' }]} />
+              <View style={dynamicStyles.barBg}>
+                <View style={[dynamicStyles.barFill, { width: `${Math.round(performance.vocabulary)}%`, backgroundColor: colors.primary }]} />
               </View>
             </View>
-
-            <View style={styles.progressCard}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.skillName}>Fluency & Rhythm</Text>
-                <Text style={styles.skillVal}>{Math.round(performance.fluency)}%</Text>
+  
+            <View style={dynamicStyles.progressCard}>
+              <View style={dynamicStyles.progressHeader}>
+                <Text style={dynamicStyles.skillName}>Grammar Accuracy</Text>
+                <Text style={dynamicStyles.skillVal}>{Math.round(performance.grammar)}%</Text>
               </View>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${Math.round(performance.fluency)}%`, backgroundColor: '#10B981' }]} />
+              <View style={dynamicStyles.barBg}>
+                <View style={[dynamicStyles.barFill, { width: `${Math.round(performance.grammar)}%`, backgroundColor: '#F97316' }]} />
+              </View>
+            </View>
+  
+            <View style={dynamicStyles.progressCard}>
+              <View style={dynamicStyles.progressHeader}>
+                <Text style={dynamicStyles.skillName}>Fluency & Rhythm</Text>
+                <Text style={dynamicStyles.skillVal}>{Math.round(performance.fluency)}%</Text>
+              </View>
+              <View style={dynamicStyles.barBg}>
+                <View style={[dynamicStyles.barFill, { width: `${Math.round(performance.fluency)}%`, backgroundColor: colors.success }]} />
               </View>
             </View>
             
-            <View style={styles.progressCard}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.skillName}>Pronunciation Clarity</Text>
-                <Text style={styles.skillVal}>{Math.round(performance.pronunciation)}%</Text>
+            <View style={dynamicStyles.progressCard}>
+              <View style={dynamicStyles.progressHeader}>
+                <Text style={dynamicStyles.skillName}>Pronunciation Clarity</Text>
+                <Text style={dynamicStyles.skillVal}>{Math.round(performance.pronunciation)}%</Text>
               </View>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${Math.round(performance.pronunciation)}%`, backgroundColor: '#8B5CF6' }]} />
+              <View style={dynamicStyles.barBg}>
+                <View style={[dynamicStyles.barFill, { width: `${Math.round(performance.pronunciation)}%`, backgroundColor: '#8B5CF6' }]} />
               </View>
             </View>
           </>
         )}
-
+  
       </ScrollView>
-
+  
       {/* Target Score Editor Modal */}
       <Modal visible={isEditingTarget} transparent={true} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Set Target Score</Text>
-            <Text style={styles.modalSubtitle}>Enter a PTE score between 10 and 90.</Text>
+        <View style={dynamicStyles.modalOverlay}>
+          <View style={dynamicStyles.modalContent}>
+            <Text style={dynamicStyles.modalTitle}>Set Target Score</Text>
+            <Text style={dynamicStyles.modalSubtitle}>Enter a PTE score between 10 and 90.</Text>
             
             <TextInput
-              style={styles.modalInput}
+              style={dynamicStyles.modalInput}
               keyboardType="number-pad"
               value={newTarget}
               onChangeText={setNewTarget}
@@ -143,55 +182,18 @@ export default function Profile() {
               autoFocus
             />
             
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setIsEditingTarget(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+            <View style={dynamicStyles.modalButtons}>
+              <TouchableOpacity style={dynamicStyles.modalCancel} onPress={() => setIsEditingTarget(false)}>
+                <Text style={dynamicStyles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSave} onPress={saveTargetScore}>
-                <Text style={styles.modalSaveText}>Save</Text>
+              <TouchableOpacity style={dynamicStyles.modalSave} onPress={saveTargetScore}>
+                <Text style={dynamicStyles.modalSaveText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
+  
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  scroll: { padding: 20 },
-  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  
-  profileCard: { backgroundColor: '#fff', borderRadius: 24, padding: 30, alignItems: 'center', marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#E2E8F0', marginBottom: 16, overflow: 'hidden' },
-  name: { fontSize: 20, fontWeight: 'bold', color: '#1E293B' },
-  targetWrapper: { marginTop: 4, padding: 4 },
-  target: { color: '#64748B', fontWeight: '500' },
-
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
-  statCard: { backgroundColor: '#fff', width: '48%', padding: 20, borderRadius: 16, alignItems: 'center', shadowOpacity: 0.05, shadowRadius: 5 },
-  statNum: { fontSize: 24, fontWeight: 'bold', color: '#2563EB', marginBottom: 4 },
-  statNumGreen: { fontSize: 24, fontWeight: 'bold', color: '#10B981', marginBottom: 4 },
-  statLabel: { fontSize: 12, fontWeight: 'bold', color: '#94A3B8', letterSpacing: 1 },
-
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  progressCard: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  skillName: { fontWeight: '600', color: '#1E293B' },
-  skillVal: { fontWeight: 'bold', color: '#2563EB' },
-  barBg: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 4 },
-  barFill: { height: '100%', borderRadius: 4 },
-  
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 },
-  modalSubtitle: { fontSize: 14, color: '#64748B', marginBottom: 20, textAlign: 'center' },
-  modalInput: { width: 100, height: 60, backgroundColor: '#F1F5F9', borderRadius: 12, fontSize: 32, fontWeight: 'bold', textAlign: 'center', color: '#1E293B', marginBottom: 24 },
-  modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
-  modalCancel: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', marginRight: 8, backgroundColor: '#F1F5F9' },
-  modalCancelText: { color: '#64748B', fontWeight: 'bold', fontSize: 16 },
-  modalSave: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', marginLeft: 8, backgroundColor: '#2563EB' },
-  modalSaveText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-});

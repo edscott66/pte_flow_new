@@ -2,13 +2,16 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { onSnapshot, doc } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import { scoreService } from '../services/scoreService';
+import { db } from '@/services/firebase';
+import { scoreService } from '@/services/scoreService';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function RootLayout() {
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
+
+function RootLayoutContent() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     // Listen for Global Reset Signal
@@ -42,13 +45,13 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#2563EB' },
+          headerStyle: { backgroundColor: colors.primary },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
-          contentStyle: { backgroundColor: '#F8FAFC' },
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         {/* The Welcome Screen */}
@@ -61,5 +64,13 @@ export default function RootLayout() {
         <Stack.Screen name="module/[id]" options={{ title: 'Practice' }} />
       </Stack>
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
   );
 }

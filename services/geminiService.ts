@@ -346,3 +346,44 @@ export const analyzeWriting = async (userSummary: string, originalTranscript: st
     throw error;
   }
 };
+
+/**
+ * Get personalized chat response for PTE-related queries.
+ */
+export const getPTEChatResponse = async (messages: { role: 'user' | 'model', content: string }[]) => {
+  try {
+    const ai = getAI();
+    
+    const contents = messages.map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }]
+    }));
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: contents,
+      config: {
+        systemInstruction: `You are an expert PTE (Pearson Test of English) Academic Coach. 
+        Your sole purpose is to help students prepare for the PTE exam. 
+        You can answer questions about:
+        - Exam structure and scoring
+        - Tips and strategies for all modules (Speaking, Writing, Reading, Listening)
+        - Practice exercises and sample questions
+        - Study plans and time management
+        - Test center information and booking (general info)
+        
+        CRITICAL RULES:
+        1. If a user asks something unrelated to PTE (e.g., "What's the weather?" or "How to bake a cake?"), politely decline and redirect them back to PTE preparation.
+        2. Keep your answers professional, encouraging, and focused on helping the student achieve their target score.
+        3. Use clear, concise explanations.
+        4. If the user asks about scoring, use the 10-90 scale standard for PTE Academic.
+        5. Do not answer questions about other exams like IELTS, TOEFL, etc., except to briefly explain differences if asked specifically about PTE vs others.`
+      }
+    });
+
+    return response.text || "I'm sorry, I couldn't generate a response.";
+  } catch (error) {
+    console.error("AI Chat Error:", error);
+    throw error;
+  }
+};

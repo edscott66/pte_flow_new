@@ -5,8 +5,8 @@ import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { generateMockExam } from '../../utils/mockExamGenerator';
-import CustomLoader from '../../components/CustomLoader';
+import { generateMockExam } from '@/utils/mockExamGenerator';
+import CustomLoader from '@/components/CustomLoader';
 
 // Import All Data Files
 import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '../../constants/multipleChoiceReadingSingleData';
@@ -32,11 +32,11 @@ import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '../../constants/highlightCo
 import { ESSAY_QUESTIONS } from '../../constants/essayData';
 import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
 import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
-import { db, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
+import { db, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
-import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '../../services/geminiService';
-import { scoreService } from '../../services/scoreService';
-import { networkService } from '../../services/networkService';
+import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '@/services/geminiService';
+import { scoreService } from '@/services/scoreService';
+import { networkService } from '@/services/networkService';
 import { Config } from '../../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
