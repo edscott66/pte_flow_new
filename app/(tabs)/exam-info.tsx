@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 
 // --- DATA CONTENT ---
 const QUESTION_TYPES = [
@@ -918,6 +919,49 @@ const HOW_WHERE_PTE_DATA = [
 // --- COMPONENT ---
 export default function ExamInfoScreen() {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const { colors, isDark } = useTheme();
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { fontSize: 24, fontWeight: 'bold', color: colors.text, padding: 20, paddingBottom: 10 },
+    scroll: { padding: 20 },
+    
+    // Card Styles
+    card: { backgroundColor: colors.surface, borderRadius: 16, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    cardTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    cardContent: { padding: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  
+    // Question Types Styles
+    partContainer: { marginTop: 20 },
+    partHeader: { color: colors.primary, fontWeight: 'bold', fontSize: 16, marginBottom: 2 },
+    duration: { color: colors.subtext, fontSize: 13, fontStyle: 'italic', marginBottom: 10 },
+    itemRow: { marginBottom: 12 },
+    itemTitle: { fontWeight: '700', color: colors.text, fontSize: 15 },
+    itemDesc: { color: colors.subtext, fontSize: 14, lineHeight: 20 },
+  
+    // Table Styles
+    tableIntro: { color: colors.subtext, fontSize: 13, textAlign: 'center', marginTop: 15, marginBottom: 10 },
+    legendBox: { backgroundColor: colors.primary + '15', padding: 10, borderRadius: 8, marginBottom: 15 },
+    legendText: { fontSize: 12, color: colors.primary, textAlign: 'center' },
+    
+    tableHeader: { flexDirection: 'row', backgroundColor: isDark ? colors.border : '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 4 },
+    tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    rowEven: { backgroundColor: isDark ? colors.background : '#FAFAFA' },
+    th: { fontWeight: 'bold', color: colors.subtext, fontSize: 13 },
+    bold: { fontWeight: 'bold', color: colors.primary },
+    
+    // Columns
+    col1: { flex: 3, fontSize: 14, color: colors.text },
+    col2: { flex: 1, textAlign: 'center', fontSize: 14, color: colors.text },
+    col3: { flex: 1, textAlign: 'center', fontSize: 14, color: colors.subtext },
+  
+    // Disclaimer Styles
+    disclaimerTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 10 },
+    disclaimerSubtitle: { fontSize: 15, fontWeight: 'bold', color: colors.subtext, marginTop: 15, marginBottom: 6 },
+    disclaimerText: { fontSize: 13, color: colors.subtext, lineHeight: 20, marginBottom: 10 }
+  });
 
   const toggleSection = (title: string) => {
     setExpandedSection(expandedSection === title ? null : title);
@@ -1241,44 +1285,4 @@ export default function ExamInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#1E293B', padding: 20, paddingBottom: 10 },
-  scroll: { padding: 20 },
-  
-  // Card Styles
-  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
-  cardContent: { padding: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-
-  // Question Types Styles
-  partContainer: { marginTop: 20 },
-  partHeader: { color: '#2563EB', fontWeight: 'bold', fontSize: 16, marginBottom: 2 },
-  duration: { color: '#64748B', fontSize: 13, fontStyle: 'italic', marginBottom: 10 },
-  itemRow: { marginBottom: 12 },
-  itemTitle: { fontWeight: '700', color: '#334155', fontSize: 15 },
-  itemDesc: { color: '#64748B', fontSize: 14, lineHeight: 20 },
-
-  // Table Styles
-  tableIntro: { color: '#64748B', fontSize: 13, textAlign: 'center', marginTop: 15, marginBottom: 10 },
-  legendBox: { backgroundColor: '#EFF6FF', padding: 10, borderRadius: 8, marginBottom: 15 },
-  legendText: { fontSize: 12, color: '#1E40AF', textAlign: 'center' },
-  
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 4 },
-  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  rowEven: { backgroundColor: '#FAFAFA' },
-  th: { fontWeight: 'bold', color: '#475569', fontSize: 13 },
-  bold: { fontWeight: 'bold', color: '#2563EB' },
-  
-  // Columns
-  col1: { flex: 3, fontSize: 14, color: '#334155' },
-  col2: { flex: 1, textAlign: 'center', fontSize: 14 },
-  col3: { flex: 1, textAlign: 'center', fontSize: 14, color: '#64748B' },
-
-  // Disclaimer Styles
-  disclaimerTitle: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginBottom: 10 },
-  disclaimerSubtitle: { fontSize: 15, fontWeight: 'bold', color: '#475569', marginTop: 15, marginBottom: 6 },
-  disclaimerText: { fontSize: 13, color: '#64748B', lineHeight: 20, marginBottom: 10 }
-});
+// Replaced by dynamic styles

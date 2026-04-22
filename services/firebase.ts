@@ -1,19 +1,37 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-import { initializeAuth, signInAnonymously } from 'firebase/auth';
-// @ts-ignore - getReactNativePersistence is available at runtime in React Native
-import { getReactNativePersistence } from 'firebase/auth';
+import * as FirebaseAuth from 'firebase/auth';
+const { initializeAuth, getAuth, signInAnonymously, getReactNativePersistence } = FirebaseAuth as any;
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import firebaseConfig from './firebase-applet-config.json';
+import { Platform } from 'react-native';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Initialize Auth with persistence for React Native
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
+// Initialize Auth with platform-specific persistence
+let authInstance;
+
+if (Platform.OS === 'web') {
+  authInstance = getAuth(app);
+} else {
+  try {
+    if (getReactNativePersistence) {
+      authInstance = initializeAuth(app, {
+        persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+      });
+    } else {
+      console.warn("getReactNativePersistence is not available, falling back to default.");
+      authInstance = getAuth(app);
+    }
+  } catch (e) {
+    console.warn("Native persistence initialization failed, falling back to default.", e);
+    authInstance = getAuth(app);
+  }
+}
+
+export const auth = authInstance;
 
 // Error handling helper
 export enum OperationType {

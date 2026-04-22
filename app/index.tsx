@@ -5,9 +5,9 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect, useRef } from 'react';
 import { scoreService } from '@/services/scoreService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { doc, setDoc, getDocs, query, collection, where, limit, orderBy, deleteDoc } from 'firebase/firestore';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -74,123 +74,40 @@ export default function WelcomeScreen() {
 
   const syncWithLeaderboard = async (userName: string) => {
     try {
-      let userId = await AsyncStorage.getItem('pte_flow_user_id');
+      await ensureAuth();
+      const firebaseUid = auth.currentUser?.uid;
+      if (!firebaseUid) return;
+
+      let userId = firebaseUid; // Use Firebase UID as the master ID
       let currentScore = await scoreService.getScore();
       
-      await ensureAuth();
-
-      if (!userId) {
-        // Try to find existing user by name to "restore" session if they cleared data
-        console.log(`[Firebase Sync] Searching for existing session for ${userName}...`);
-        // Order by score desc to get the best session if multiple exist
-        const q = query(
-          collection(db, 'leaderboard'), 
-          where('name', '==', userName), 
-          orderBy('score', 'desc'),
-          limit(1)
-        );
-        
-        try {
-          let querySnapshot = await getDocs(q);
-          
-          // Fallback: If query fails (e.g. missing index) or is empty, try a simpler query
-          if (querySnapshot.empty) {
-            console.log(`[Firebase Sync] No session found with orderBy. Trying simple query...`);
-            const simpleQ = query(collection(db, 'leaderboard'), where('name', '==', userName), limit(5));
-            querySnapshot = await getDocs(simpleQ);
-          }
-          
-          if (!querySnapshot.empty) {
-            // Sort in memory if we have multiple results from the simple query
-            const docs = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
-            docs.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
-            
-            const bestDoc = docs[0];
-            userId = bestDoc.id;
-            const cloudScore = bestDoc.score || 0;
-            
-            console.log(`[Firebase Sync] Found best existing session: ${userId} with score ${cloudScore}`);
-            
-            // Cleanup: Delete other sessions with the same name that have lower scores
-            if (docs.length > 1) {
-              console.log(`[Firebase Sync] Cleaning up ${docs.length - 1} duplicate sessions...`);
-              for (let i = 1; i < docs.length; i++) {
-                deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch((e: any) => console.log("Cleanup failed", e));
-              }
-            }
-            
-            if (cloudScore > currentScore) {
-              currentScore = cloudScore;
-              await scoreService.setScore(cloudScore);
-            }
-            
-            // Restore attempted questions
-            const cloudAttempted = bestDoc.attemptedQuestions || [];
-            if (cloudAttempted.length > 0) {
-              const localAttempted = await scoreService.getAttemptedQuestions();
-              // Merge unique IDs
-              const merged = Array.from(new Set([...localAttempted, ...cloudAttempted]));
-              await scoreService.setAttemptedQuestions(merged);
-              console.log(`[Firebase Sync] Restored ${cloudAttempted.length} attempted questions`);
-            }
-
-            await AsyncStorage.setItem('pte_flow_user_id', userId!);
-            console.log(`[Firebase Sync] Restored session for ${userName} with score ${currentScore}`);
-          } else {
-            console.log(`[Firebase Sync] No existing session found for ${userName}. Creating new.`);
-            userId = Math.random().toString(36).substring(7);
-            await AsyncStorage.setItem('pte_flow_user_id', userId);
-          }
-        } catch (error) {
-          console.log("[Firebase Sync] Advanced query failed, trying simple fallback...", error);
-          try {
-            const simpleQ = query(collection(db, 'leaderboard'), where('name', '==', userName), limit(5));
-            const querySnapshot = await getDocs(simpleQ);
-            if (!querySnapshot.empty) {
-              const docs = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
-              docs.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
-              const bestDoc = docs[0];
-              userId = bestDoc.id;
-              const cloudScore = bestDoc.score || 0;
-
-              // Cleanup: Delete other sessions with the same name that have lower scores
-              if (docs.length > 1) {
-                for (let i = 1; i < docs.length; i++) {
-                  deleteDoc(doc(db, 'leaderboard', docs[i].id)).catch((e: any) => {});
-                }
-              }
-
-              if (cloudScore > currentScore) {
-                currentScore = cloudScore;
-                await scoreService.setScore(cloudScore);
-              }
-
-              // Restore attempted questions
-              const cloudAttempted = bestDoc.attemptedQuestions || [];
-              if (cloudAttempted.length > 0) {
-                const localAttempted = await scoreService.getAttemptedQuestions();
-                const merged = Array.from(new Set([...localAttempted, ...cloudAttempted]));
-                await scoreService.setAttemptedQuestions(merged);
-              }
-
-              await AsyncStorage.setItem('pte_flow_user_id', userId!);
-            } else {
-              userId = Math.random().toString(36).substring(7);
-              await AsyncStorage.setItem('pte_flow_user_id', userId);
-            }
-          } catch (e2) {
-            userId = Math.random().toString(36).substring(7);
-            await AsyncStorage.setItem('pte_flow_user_id', userId);
-          }
-        }
-      }
-      
       console.log(`[Firebase Sync] Syncing user ${userName} (${userId}) with score ${currentScore}`);
-      const userDocRef = doc(db, 'leaderboard', userId!);
+      const userDocRef = doc(db, 'leaderboard', userId);
       
       const attempted = await scoreService.getAttemptedQuestions();
       
       try {
+        // First check if we need to "import" a legacy score by name
+        const hasSyncedBefore = await AsyncStorage.getItem('pte_flow_has_synced_v2');
+        if (!hasSyncedBefore) {
+            console.log(`[Firebase Sync] First sync for ${userName}. Checking for legacy data...`);
+            const q = query(collection(db, 'leaderboard'), where('name', '==', userName), orderBy('score', 'desc'), limit(1));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const legacyData = querySnapshot.docs[0].data() as any;
+                if (legacyData.score > currentScore) {
+                    currentScore = legacyData.score;
+                    await scoreService.setScore(currentScore);
+                }
+                const legacyAttempted = legacyData.attemptedQuestions || [];
+                const localAttempted = await scoreService.getAttemptedQuestions();
+                const merged = Array.from(new Set([...localAttempted, ...legacyAttempted]));
+                await scoreService.setAttemptedQuestions(merged);
+            }
+            await AsyncStorage.setItem('pte_flow_has_synced_v2', 'true');
+            await AsyncStorage.setItem('pte_flow_user_id', userId);
+        }
+
         await setDoc(userDocRef, {
           userId,
           name: userName,

@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * PTE AI Service
@@ -228,6 +229,9 @@ function pcmBase64ToWavDataUri(pcmB64: string, sampleRate = 24000): string {
 export const synthesizeSpeech = async (text: string): Promise<string | null> => {
     try {
         const ai = getAI();
+        const storedVoice = await AsyncStorage.getItem('pte_coach_voice');
+        const voiceName = storedVoice || 'Aoede';
+
         const response = await ai.models.generateContent({
             model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text }] }],
@@ -235,7 +239,7 @@ export const synthesizeSpeech = async (text: string): Promise<string | null> => 
                 responseModalities: ["AUDIO"],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Aoede' } // High-quality British-style voice
+                        prebuiltVoiceConfig: { voiceName } 
                     }
                 }
             }

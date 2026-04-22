@@ -141,6 +141,48 @@ export const scoreService = {
     await AsyncStorage.setItem(AVATAR_URI_KEY, uri);
   },
 
+  async getSubscriptionStartDate(): Promise<number> {
+    const key = 'pte_flow_sub_start_date';
+    const existing = await AsyncStorage.getItem(key);
+    if (existing) {
+      return parseInt(existing, 10);
+    }
+    const now = Date.now();
+    await AsyncStorage.setItem(key, now.toString());
+    return now;
+  },
+
+  async getSubscriptionStatus() {
+    const startDate = await this.getSubscriptionStartDate();
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const expiryDate = startDate + (60 * msPerDay);
+    const now = Date.now();
+    
+    // Days remaining = expiry date − current date (rounded down)
+    const daysRemaining = Math.floor((expiryDate - now) / msPerDay);
+    
+    let text = '';
+    let color = '';
+    
+    if (daysRemaining > 3) {
+      text = `Active — ${daysRemaining} days remaining`;
+      color = '#10B981'; // Green
+    } else if (daysRemaining <= 3 && daysRemaining >= 0) {
+      text = `Expires in ${daysRemaining} days`;
+      color = '#EF4444'; // Red
+    } else {
+      text = `Expired — Renew now`;
+      color = '#EF4444'; // Red
+    }
+
+    return {
+      daysRemaining,
+      text,
+      color,
+      isExpired: daysRemaining < 0
+    };
+  },
+
   async clearAllLocalData() {
     const keys = [
       ATTEMPTED_QUESTIONS_KEY,

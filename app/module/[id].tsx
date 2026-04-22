@@ -7,37 +7,38 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateMockExam } from '@/utils/mockExamGenerator';
 import CustomLoader from '@/components/CustomLoader';
+import { useTheme } from '@/context/ThemeContext';
 
 // Import All Data Files
-import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '../../constants/multipleChoiceReadingSingleData';
-import { MODULES } from '../../constants/modules';
-import { READ_ALOUD_QUESTIONS } from '../../constants/readAloudData';
-import { REPEAT_SENTENCE_QUESTIONS } from '../../constants/repeatSentenceData';
-import { DESCRIBE_IMAGE_QUESTIONS } from '../../constants/describeImageData';
-import { REORDER_PARAGRAPHS_QUESTIONS } from '../../constants/reOrderParagraphsData';
-import { FILL_BLANKS_QUESTIONS } from '../../constants/fillBlanksData';
-import { SUMMARIZE_SPOKEN_QUESTIONS } from '../../constants/summarizeSpokenData';
-import { WRITE_DICTATION_QUESTIONS } from '../../constants/writeDictationData';
-import { HIGHLIGHT_INCORRECT_QUESTIONS } from '../../constants/highlightIncorrectData';
-import { MULTIPLE_CHOICE_QUESTIONS } from '../../constants/multipleChoiceData';
-import { SUMMARIZE_WRITTEN_QUESTIONS } from '../../constants/summarizeWrittenData';
-import { RETELL_LECTURE_QUESTIONS } from '../../constants/retellLectureData';
-import { ANSWER_SHORT_QUESTION_DATA } from '../../constants/answerShortQuestionData';
-import { FILL_BLANKS_RW_QUESTIONS } from '../../constants/fillBlanksRWData';
-import { MULTIPLE_CHOICE_SINGLE_QUESTIONS } from '../../constants/multipleChoiceSingleData';
-import { MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS } from '../../constants/multipleChoiceListeningMultiData';
-import { LISTENING_FILL_BLANKS_QUESTIONS } from '../../constants/listeningFillBlanksData';
-import { SELECT_MISSING_WORD_QUESTIONS } from '../../constants/selectMissingWordData';
-import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '../../constants/highlightCorrectSummaryData';
-import { ESSAY_QUESTIONS } from '../../constants/essayData';
-import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
-import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
+import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '@/constants/multipleChoiceReadingSingleData';
+import { MODULES } from '@/constants/modules';
+import { READ_ALOUD_QUESTIONS } from '@/constants/readAloudData';
+import { REPEAT_SENTENCE_QUESTIONS } from '@/constants/repeatSentenceData';
+import { DESCRIBE_IMAGE_QUESTIONS } from '@/constants/describeImageData';
+import { REORDER_PARAGRAPHS_QUESTIONS } from '@/constants/reOrderParagraphsData';
+import { FILL_BLANKS_QUESTIONS } from '@/constants/fillBlanksData';
+import { SUMMARIZE_SPOKEN_QUESTIONS } from '@/constants/summarizeSpokenData';
+import { WRITE_DICTATION_QUESTIONS } from '@/constants/writeDictationData';
+import { HIGHLIGHT_INCORRECT_QUESTIONS } from '@/constants/highlightIncorrectData';
+import { MULTIPLE_CHOICE_QUESTIONS } from '@/constants/multipleChoiceData';
+import { SUMMARIZE_WRITTEN_QUESTIONS } from '@/constants/summarizeWrittenData';
+import { RETELL_LECTURE_QUESTIONS } from '@/constants/retellLectureData';
+import { ANSWER_SHORT_QUESTION_DATA } from '@/constants/answerShortQuestionData';
+import { FILL_BLANKS_RW_QUESTIONS } from '@/constants/fillBlanksRWData';
+import { MULTIPLE_CHOICE_SINGLE_QUESTIONS } from '@/constants/multipleChoiceSingleData';
+import { MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS } from '@/constants/multipleChoiceListeningMultiData';
+import { LISTENING_FILL_BLANKS_QUESTIONS } from '@/constants/listeningFillBlanksData';
+import { SELECT_MISSING_WORD_QUESTIONS } from '@/constants/selectMissingWordData';
+import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '@/constants/highlightCorrectSummaryData';
+import { ESSAY_QUESTIONS } from '@/constants/essayData';
+import { SUMMARIZE_GROUP_QUESTIONS } from '@/constants/summarizeGroupData'; 
+import { RESPOND_SITUATION_QUESTIONS } from '@/constants/respondSituationData';
 import { db, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '@/services/geminiService';
 import { scoreService } from '@/services/scoreService';
 import { networkService } from '@/services/networkService';
-import { Config } from '../../constants/config';
+import { Config } from '@/constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
@@ -195,8 +196,157 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
 export default function ModuleScreen() {
   const { id, startIndex } = useLocalSearchParams();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
-  // 1. STATE DEFINITIONS (Fixes setQuestions and setLoading errors)
+  const styles = React.useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      paddingVertical: 10, 
+      paddingHorizontal: 15,
+      borderBottomWidth: 1, 
+      borderBottomColor: colors.border, 
+      backgroundColor: colors.surface,
+      height: 80,
+    },
+    headerLeft: { width: 50, alignItems: 'flex-start' },
+    headerCenter: { flex: 1, alignItems: 'center' },
+    headerRight: { width: 50 },
+    backButton: { position: 'absolute', left: 20, zIndex: 10, padding: 5 },
+    scoreBadge: { backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginBottom: 5, borderWidth: 1, borderColor: colors.primary + '30' },
+    scoreText: { color: colors.primary, fontWeight: 'bold', fontSize: 12 },
+    headerTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center', lineHeight: 20 },
+    carouselContainer: { },
+    fullScreenPage: { width: width, padding: 20 },
+    card: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+    questionIndex: { color: colors.subtext, marginBottom: 10, fontWeight: 'bold' },
+    questionText: { fontSize: 20, lineHeight: 30, color: colors.text },
+    readingText: { fontSize: 16, lineHeight: 24, color: colors.text },
+    label: { fontSize: 12, color: colors.subtext, fontWeight: 'bold', marginBottom: 4 },
+    textScroll: { width: '100%', minHeight: 100, marginBottom: 10, },
+    textScrollContent: { flexGrow: 1, justifyContent: 'center' },
+    audioPlaceholder: { justifyContent: 'center', alignItems: 'center', width: '100%' },
+    listenBox: { alignItems: 'center', gap: 10 },
+    listenText: { fontSize: 18, color: colors.subtext, fontWeight: '500' },
+    imageContainer: { alignItems: 'center', justifyContent: 'flex-start' },
+    chartImage: { width: '100%', height: 180, marginTop: 20, marginBottom: 10, backgroundColor: isDark ? colors.border : '#F1F5F9' },
+    missingImage: { width: '100%', height: 180, backgroundColor: isDark ? colors.border : '#F1F5F9', alignItems:'center', justifyContent:'center', borderRadius:8, marginTop: 20 },
+    imageTitle: { marginTop: 10, fontSize: 16, fontWeight:'600', color: colors.text, textAlign:'center'},
+    zoomIcon: { position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 5 },
+    controls: { padding: 10, paddingBottom: 20, backgroundColor: colors.background, borderTopWidth: 1,  borderTopColor: colors.border }, 
+    timerBox: { alignItems: 'center', marginBottom: 20 },
+    timerText: { fontSize: 16, color: colors.subtext, marginBottom: 5, fontWeight: '600' },
+    timerCount: { fontSize: 48, fontWeight: 'bold', color: colors.text },
+    textRed: { color: '#EF4444' },
+    textGreen: { color: '#10B981' }, 
+    resultBox: { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', padding: 10, borderRadius: 16, marginBottom: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, alignItems: 'center', elevation: 3, width: '100%' },
+    resultTitle: { fontSize: 24, fontWeight: 'bold', color: '#10B981', marginBottom: 5 },
+    resultSub: { fontSize: 16, color: '#10B981', marginBottom: 15 },
+    idleControls: { flexDirection: 'column', alignItems: 'center', gap: 20, width: '100%' },
+    btnPrimary: { backgroundColor: colors.primary, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
+    modelBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#78350F' : '#FEF3C7', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B', shadowColor: '#F59E0B', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
+    btnSecondary: { backgroundColor: isDark ? colors.border : '#E2E8F0', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
+    btnDanger: { backgroundColor: '#EF4444', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
+    nextBtn: { backgroundColor: '#10B981', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
+    btnPrimarySmall: { backgroundColor: colors.primary, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
+    nextBtnSmall: { backgroundColor: '#10B981', height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
+    btnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+    btnTextSmall: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+    btnTextDark: { color: colors.text, fontSize: 18, fontWeight: 'bold' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: colors.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    modelText: { fontSize: 16, lineHeight: 24, color: colors.text },
+    closeBtn: { marginTop: 20, backgroundColor: colors.primary, padding: 14, borderRadius: 12, alignItems: 'center' },
+    closeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    reOrderTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 5 },
+    targetArea: { flex: 1, minHeight: 150, backgroundColor: colors.primary + '15', borderRadius: 12, padding: 10, marginBottom: 10, borderStyle: 'dashed', borderWidth: 2, borderColor: colors.primary + '30' },
+    sourceArea: { flex: 1, minHeight: 150, backgroundColor: isDark ? colors.border : '#F8FAFC', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.border },
+    areaLabel: { fontSize: 12, fontWeight: 'bold', color: colors.subtext, marginBottom: 8, textTransform: 'uppercase' },
+    placeholderText: { color: colors.subtext, textAlign: 'center', marginTop: 20, fontStyle: 'italic' },
+    draggableItem: { backgroundColor: colors.primary, padding: 12, borderRadius: 8, marginBottom: 8 },
+    sourceItem: { backgroundColor: colors.surface, padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+    textWhite: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
+    textDark: { color: colors.text, fontSize: 14, fontWeight: '500' },
+    fibContainer: { flexGrow: 1 },
+    fibTextWrapper: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+    fibText: { fontSize: 18, lineHeight: 50, color: colors.text, marginBottom: 0, },
+    blankBox: { color: colors.primary, fontWeight: 'bold', backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: colors.primary, marginHorizontal: 2 },
+    blankFilled: { backgroundColor: colors.primary, color: '#fff' },
+    blankCorrect: { backgroundColor: '#10B981', borderColor: '#10B981', color: '#fff' },
+    blankWrong: { backgroundColor: '#EF4444', borderColor: '#EF4444', color: '#fff' },
+    modalOverlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
+    modalContentBottom: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+    wordChip: { backgroundColor: isDark ? colors.border : '#F1F5F9', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
+    wordChipText: { fontSize: 16, color: colors.text, fontWeight: '500' },
+    audioControlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 15, padding: 10, backgroundColor: isDark ? colors.border : '#F1F5F9', borderRadius: 12 },
+    miniPlayBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    miniPlayText: { color: colors.primary, fontWeight: '600', fontSize: 16 },
+    summaryInput: { flex: 1, backgroundColor: isDark ? colors.border : '#F8FAFC', borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 15, fontSize: 16, lineHeight: 24, textAlignVertical: 'top', minHeight: 150, color: colors.text },
+    wordCountRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 },
+    wordCountText: { fontSize: 13, fontWeight: 'bold', color: colors.text },
+    speedControlRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+    speedBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 8, backgroundColor: colors.primary + '15', borderRadius: 12 },
+    speedText: { color: colors.primary, fontWeight: 'bold' },
+    highlightContainer: { flexDirection: 'row', flexWrap: 'wrap' },
+    wordBubble: { borderRadius: 4, paddingHorizontal: 2, paddingVertical: 1, marginVertical: 2 },
+    wordText: { fontSize: 18, lineHeight: 28, color: colors.text }, 
+    mcOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 12, backgroundColor: isDark ? colors.surface : '#F8FAFC' },
+    checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.border, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
+    mcText: { fontSize: 16, color: colors.text, flex: 1 },
+    sourceTextBox: { backgroundColor: isDark ? colors.border : '#F1F5F9', padding: 10, borderRadius: 8 },
+    speakNowOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 9999 },
+    speakNowBox: { backgroundColor: colors.surface, paddingVertical: 25, paddingHorizontal: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+    speakNowText: { fontSize: 32, fontWeight: 'bold', color: '#10B981' },
+    zoomOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    zoomCloseArea: { position: 'absolute', top: 50, right: 20, zIndex: 99, padding: 20 },
+    fullScreenImage: { width: width, height: '80%' },
+    wordBankContainer: { marginBottom: 15, padding: 10, backgroundColor: isDark ? colors.border : '#F1F5F9', borderRadius: 12 },
+    wordBankGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
+    wordBankItem: { backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+    inlineInput: { 
+      minWidth: 120, borderBottomWidth: 2, borderBottomColor: colors.primary, paddingHorizontal: 12, marginHorizontal: 4, height: 40, 
+      backgroundColor: colors.primary + '15', borderRadius: 8, marginTop: 4, fontSize: 16, color: colors.text, textAlign: 'center',
+      justifyContent: 'center', alignItems: 'center', textAlignVertical: 'center'
+    },
+    inputCorrect: { backgroundColor: '#D1FAE5', borderBottomColor: '#10B981', color: '#065F46' },
+    inputWrong: { backgroundColor: '#FEE2E2', borderBottomColor: '#EF4444', color: '#B91C1C' },
+    jumpToContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, backgroundColor: colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
+    jumpToLabel: { fontSize: 10, fontWeight: '900', color: colors.subtext, marginRight: 10, letterSpacing: 0.5 },
+    jumpToScroll: { alignItems: 'center', gap: 10, paddingRight: 20 },
+    jumpCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface },
+    jumpCircleActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    jumpCircleText: { fontSize: 14, color: colors.subtext, fontWeight: '700' },
+    jumpCircleTextActive: { color: '#fff' },
+    processingOverlay: { padding: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)', borderRadius: 12, marginTop: 20 },
+    processingText: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center' },
+    processingSubText: { marginTop: 5, fontSize: 13, color: colors.subtext, textAlign: 'center' },
+    breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 5 },
+    boldLabel: { fontWeight: 'bold', color: colors.text },
+    boldValue: { fontWeight: 'bold', color: colors.primary },
+    reOrderResultItem: { marginBottom: 8, padding: 10, backgroundColor: isDark ? colors.border : '#F0F9FF', borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '30' },
+    feedbackOverlay: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 100 },
+    feedbackPopup: { width: '90%', padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, elevation: 5, gap: 10 },
+    feedbackText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    dropdownModalContent: { backgroundColor: colors.surface, borderRadius: 24, padding: 24, width: '90%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
+    dropdownTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16, textAlign: 'center' },
+    dropdownItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
+    dropdownItemText: { fontSize: 16, color: colors.text, textAlign: 'center' },
+    dropdownCloseBtn: { marginTop: 20, backgroundColor: isDark ? colors.border : '#F1F5F9', padding: 14, borderRadius: 12, alignItems: 'center' },
+    dropdownCloseText: { color: colors.text, fontWeight: 'bold', fontSize: 16 },
+  }), [colors, isDark]);
+
+  const FeedbackRow = ({label, text, isIncorrect}: {label: string, text: string, isIncorrect?: boolean}) => (
+    <View style={{marginBottom: 8, width: '100%', borderBottomWidth: 1, borderBottomColor: isIncorrect ? '#FECACA' : colors.border, paddingBottom: 4}}>
+       <Text style={{fontWeight: 'bold', color: isIncorrect ? '#991B1B' : colors.text, fontSize: 14}}>{label}</Text>
+       <Text style={{color: isIncorrect ? '#7F1D1D' : colors.subtext, fontSize: 13}}>{text}</Text>
+    </View>
+  );
+
+  // 1. STATE DEFINITIONS
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(startIndex ? parseInt(startIndex as string, 10) : 0);
@@ -977,6 +1127,7 @@ export default function ModuleScreen() {
 
   async function stopRecording(activeRecording: Audio.Recording | null) {
     stopTimer();
+
     const rec = activeRecording || recording;
     
     if (!rec) {
@@ -1860,12 +2011,12 @@ export default function ModuleScreen() {
               <MaterialCommunityIcons 
                 name={mode === 'PLAYING_AUDIO' ? "volume-high" : mode === 'RECORDING' ? "microphone" : "microphone-outline"} 
                 size={80} 
-                color={mode === 'RECORDING' ? '#EF4444' : '#2563EB'} 
+                color={mode === 'RECORDING' ? '#EF4444' : colors.primary} 
               />
-              <Text style={{fontSize: 20, fontWeight: 'bold', marginTop: 10}}>{item.title}</Text>
+              <Text style={{fontSize: 20, fontWeight: 'bold', marginTop: 10, color: colors.text}}>{item.title}</Text>
               
-              <View style={{backgroundColor: '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginTop: 10}}>
-                <Text style={{color:'#475569', fontWeight: 'bold'}}>
+              <View style={{backgroundColor: isDark ? colors.border : '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginTop: 10}}>
+                <Text style={{color: colors.subtext, fontWeight: 'bold'}}>
                   {mode === 'IDLE' ? 'Ready to Start' : 
                    mode === 'PLAYING_AUDIO' ? 'Listening to Lecture...' :
                    mode === 'PREP_RETELL' ? `Prepare to Retell: ${timeLeft}s` :
@@ -1923,14 +2074,14 @@ export default function ModuleScreen() {
         {isEssay && (
           <View style={{flex: 1}}>
              <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                <Text style={{fontWeight:'bold', color:'#64748B'}}>Time Remaining:</Text>
-                <Text style={{fontWeight:'bold', fontSize:18, color: timeLeft < 120 ? '#EF4444' : '#2563EB'}}>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
+                <Text style={{fontWeight:'bold', color: colors.subtext}}>Time Remaining:</Text>
+                <Text style={{fontWeight:'bold', fontSize:18, color: timeLeft < 120 ? '#EF4444' : colors.primary}}>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
              </View>
              <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom: 40}}>
-                <View style={{marginBottom: 20}}><Text style={{fontSize:18, fontWeight:'bold', color:'#1E293B', marginBottom: 5}}>Topic:</Text><Text style={{fontSize:18, lineHeight:28, color:'#1E293B'}}>{item.topic}</Text></View>
+                <View style={{marginBottom: 20}}><Text style={{fontSize:18, fontWeight:'bold', color: colors.text, marginBottom: 5}}>Topic:</Text><Text style={{fontSize:18, lineHeight:28, color: colors.text}}>{item.topic}</Text></View>
                 <Text style={styles.areaLabel}>Your Response:</Text>
-                <TextInput style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 15, fontSize: 16, lineHeight: 24, textAlignVertical: 'top', minHeight: 300, marginBottom: 10 }} multiline placeholder="Type your essay here..." value={userSummary} onChangeText={(text) => { setUserSummary(text); setWordCount(text.trim().split(/\s+/).filter(w => w.length > 0).length); }} editable={mode !== 'RESULT'} />
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20}}><Text style={{color: '#64748B'}}>Target: 200-300 words</Text><Text style={{fontWeight: 'bold', color: (wordCount >= 200 && wordCount <= 300) ? '#10B981' : '#EF4444'}}>Word Count: {wordCount}</Text></View>
+                <TextInput style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 15, fontSize: 16, lineHeight: 24, textAlignVertical: 'top', minHeight: 300, marginBottom: 10, color: colors.text }} multiline placeholder="Type your essay here..." value={userSummary} onChangeText={(text) => { setUserSummary(text); setWordCount(text.trim().split(/\s+/).filter(w => w.length > 0).length); }} editable={mode !== 'RESULT'} />
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20}}><Text style={{color: colors.subtext}}>Target: 200-300 words</Text><Text style={{fontWeight: 'bold', color: (wordCount >= 200 && wordCount <= 300) ? '#10B981' : '#EF4444'}}>Word Count: {wordCount}</Text></View>
                 {mode === 'IDLE' && ( <TouchableOpacity style={styles.btnPrimary} onPress={() => { handleEssaySubmit(); }}><Text style={styles.btnText}>Submit Essay</Text></TouchableOpacity> )}
              </ScrollView>
           </View>
@@ -1944,16 +2095,16 @@ export default function ModuleScreen() {
                
                {/* 1. TEXT DISPLAYS (Hidden until Start is pressed!) */}
                {isRespondSituation && mode !== 'IDLE' && (
-                  <View style={{backgroundColor:'#F0FDFA', padding:15, borderRadius:8, marginBottom:15}}>
-                     <Text style={{color:'#0F766E', fontWeight:'bold', marginBottom:5}}>Situation:</Text>
-                     <Text style={{fontSize:16, marginBottom:10, lineHeight:22, color:'#1E293B'}}>{item.situation}</Text>
-                     <Text style={{color:'#0F766E', fontWeight:'bold'}}>Task: <Text style={{fontWeight:'normal', color:'#334155'}}>{item.task}</Text></Text>
+                  <View style={{backgroundColor: isDark ? colors.border : '#F0FDFA', padding:15, borderRadius:8, marginBottom:15}}>
+                     <Text style={{color: isDark ? colors.primary : '#0F766E', fontWeight:'bold', marginBottom:5}}>Situation:</Text>
+                     <Text style={{fontSize:16, marginBottom:10, lineHeight:22, color: colors.text}}>{item.situation}</Text>
+                     <Text style={{color: isDark ? colors.primary : '#0F766E', fontWeight:'bold'}}>Task: <Text style={{fontWeight:'normal', color: colors.text}}>{item.task}</Text></Text>
                   </View>
                )}
                {isSummarizeGroup && mode !== 'IDLE' && (
-                   <View style={{backgroundColor:'#F0F9FF', padding:15, borderRadius:8, marginBottom:15}}>
-                      <Text style={{color:'#0369A1', fontWeight:'bold', marginBottom:5}}>Topic:</Text>
-                      <Text style={{fontSize:16, lineHeight:22, color:'#1E293B'}}>{item.topic}</Text>
+                   <View style={{backgroundColor: isDark ? colors.border : '#F0F9FF', padding:15, borderRadius:8, marginBottom:15}}>
+                      <Text style={{color: isDark ? colors.primary : '#0369A1', fontWeight:'bold', marginBottom:5}}>Topic:</Text>
+                      <Text style={{fontSize:16, lineHeight:22, color: colors.text}}>{item.topic}</Text>
                    </View>
                 )}
 
@@ -2992,296 +3143,4 @@ export default function ModuleScreen() {
     </SafeAreaView>
   );
 }
-// STYLES
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-   header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 10, 
-    paddingHorizontal: 15,
-    borderBottomWidth: 1, 
-    borderBottomColor: '#E2E8F0', 
-    backgroundColor: '#fff',
-    height: 80, // Fixed height for stability
-  },
-  headerLeft: { width: 50, alignItems: 'flex-start' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerRight: { width: 50 }, // Balances the left side so center stays true center
-  backButton: {
-    position: 'absolute', // Sticks to the left
-    left: 20,
-    zIndex: 10, // Ensures it is clickable
-    padding: 5,
-  },
-  scoreBadge: { 
-    backgroundColor: '#EFF6FF', 
-    paddingHorizontal: 10, 
-    paddingVertical: 3, 
-    borderRadius: 12, 
-    marginBottom: 5, // Space between score and title
-    borderWidth: 1,
-    borderColor: '#BFDBFE'
-  },
-  scoreText: { 
-    color: '#2563EB', 
-    fontWeight: 'bold', 
-    fontSize: 12 
-  },
-  headerTitle: { 
-    fontSize: 16, // Slightly smaller to fit long titles
-    fontWeight: 'bold', 
-    color: '#1E293B', 
-    textAlign: 'center', // Ensures long titles wrap nicely in the center
-    lineHeight: 20,
-  },
-  carouselContainer: { },
-  fullScreenPage: { width: width, padding: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
-  questionIndex: { color: '#64748B', marginBottom: 10, fontWeight: 'bold' },
-  questionText: { fontSize: 20, lineHeight: 30, color: '#1E293B' },
-  readingText: { fontSize: 16, lineHeight: 24, color: '#334155' },
-  label: { fontSize: 12, color: '#94A3B8', fontWeight: 'bold', marginBottom: 4 },
-  textScroll: { width: '100%', minHeight: 100, marginBottom: 10, },
-  textScrollContent: { flexGrow: 1, justifyContent: 'center' },
-  audioPlaceholder: { justifyContent: 'center', alignItems: 'center', width: '100%' },
-  listenBox: { alignItems: 'center', gap: 10 },
-  listenText: { fontSize: 18, color: '#64748B', fontWeight: '500' },
-  imageContainer: { alignItems: 'center', justifyContent: 'flex-start' },
-  
-  // ZOOM STYLES
-  chartImage: { width: '100%', height: 180, marginTop: 20, marginBottom: 10, backgroundColor: '#F1F5F9' },
-  missingImage: { width: '100%', height: 180, backgroundColor:'#F1F5F9', alignItems:'center', justifyContent:'center', borderRadius:8, marginTop: 20 },
-  imageTitle: { marginTop: 10, fontSize: 16, fontWeight:'600', color:'#334155', textAlign:'center'},
-  zoomIcon: { position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 5 },
-  controls: { padding: 10, paddingBottom: 20, backgroundColor: '#F8FAFC', borderTopWidth: 1,  borderTopColor: '#E2E8F0', }, 
-  timerBox: { alignItems: 'center', marginBottom: 20 },
-  timerText: { fontSize: 16, color: '#64748B', marginBottom: 5, fontWeight: '600' },
-  timerCount: { fontSize: 48, fontWeight: 'bold', color: '#1E293B' },
-  textRed: { color: '#EF4444' },
-  textGreen: { color: '#10B981' }, 
-   resultBox: { backgroundColor: '#ECFDF5', padding: 10, borderRadius: 16, marginBottom: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, alignItems: 'center', elevation: 3, width: '100%' },
-  resultTitle: { fontSize: 24, fontWeight: 'bold', color: '#059669', marginBottom: 5 },
-  resultSub: { fontSize: 16, color: '#047857', marginBottom: 15 },
-  idleControls: { flexDirection: 'column', alignItems: 'center', gap: 20, width: '100%' },
-  btnPrimary: { backgroundColor: '#2563EB', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  modelBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B', shadowColor: '#F59E0B', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
-  btnSecondary: { backgroundColor: '#E2E8F0', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
-  btnDanger: { backgroundColor: '#EF4444', padding: 18, borderRadius: 50, alignItems: 'center', width: '100%' },
-  nextBtn: { backgroundColor: '#059669', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  btnPrimarySmall: { backgroundColor: '#2563EB', height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  nextBtnSmall: { backgroundColor: '#059669', height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  btnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  btnTextSmall: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  btnTextDark: { color: '#1E293B', fontSize: 18, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B' },
-  modelText: { fontSize: 16, lineHeight: 24, color: '#334155' },
-  closeBtn: { marginTop: 20, backgroundColor: '#2563EB', padding: 14, borderRadius: 12, alignItems: 'center' },
-  closeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  reOrderTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 5 },
-  targetArea: { flex: 1, minHeight: 150, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 10, marginBottom: 10, borderStyle: 'dashed', borderWidth: 2, borderColor: '#BFDBFE' },
-  sourceArea: { flex: 1, minHeight: 150, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  areaLabel: { fontSize: 12, fontWeight: 'bold', color: '#64748B', marginBottom: 8, textTransform: 'uppercase' },
-  placeholderText: { color: '#94A3B8', textAlign: 'center', marginTop: 20, fontStyle: 'italic' },
-  draggableItem: { backgroundColor: '#2563EB', padding: 12, borderRadius: 8, marginBottom: 8 },
-  sourceItem: { backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  textWhite: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
-  textDark: { color: '#1E293B', fontSize: 14, fontWeight: '500' },
-  fibContainer: { flexGrow: 1 },
-  fibTextWrapper: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
-  fibText: { fontSize: 18, lineHeight: 50, color: '#1E293B', marginBottom: 0, },
-  blankBox: { color: '#2563EB', fontWeight: 'bold', backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#2563EB', marginHorizontal: 2 },
-  blankFilled: { backgroundColor: '#2563EB', color: '#fff' },
-  blankCorrect: { backgroundColor: '#10B981', borderColor: '#10B981', color: '#fff' },
-  blankWrong: { backgroundColor: '#EF4444', borderColor: '#EF4444', color: '#fff' },
-  modalOverlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
-  modalContentBottom: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  wordChip: { backgroundColor: '#F1F5F9', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
-  wordChipText: { fontSize: 16, color: '#1E293B', fontWeight: '500' },
-  audioControlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 15, padding: 10, backgroundColor: '#F1F5F9', borderRadius: 12 },
-  miniPlayBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  miniPlayText: { color: '#2563EB', fontWeight: '600', fontSize: 16 },
-  summaryInput: { flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 15, fontSize: 16, lineHeight: 24, textAlignVertical: 'top', minHeight: 150 },
-  wordCountRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 },
-  wordCountText: { fontSize: 13, fontWeight: 'bold' },
-  speedControlRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  speedBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 8, backgroundColor: '#EFF6FF', borderRadius: 12 },
-  speedText: { color: '#2563EB', fontWeight: 'bold' },
-  highlightContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  wordBubble: { borderRadius: 4, paddingHorizontal: 2, paddingVertical: 1, marginVertical: 2 },
-  wordText: { fontSize: 18, lineHeight: 28 }, 
-  mcOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, backgroundColor: '#F8FAFC' },
-  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', marginRight: 12, alignItems: 'center', justifyContent: 'center' },
-  mcText: { fontSize: 16, color: '#1E293B', flex: 1 },
-  sourceTextBox: { backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8 },
-  
-  // NEW STYLES
-  speakNowOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 9999 },
-  speakNowBox: { backgroundColor: '#fff', paddingVertical: 25, paddingHorizontal: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
-  speakNowText: { fontSize: 32, fontWeight: 'bold', color: '#10B981' },
-  
-  // ZOOM STYLES (REACT-NATIVE-IMAGE-VIEWING handles fullscreen, these are just for triggers)
-  zoomOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  zoomCloseArea: { position: 'absolute', top: 50, right: 20, zIndex: 99, padding: 20 },
-  fullScreenImage: { width: width, height: '80%' },
-  
-  // RESTORED R&W STYLES
-  wordBankContainer: { marginBottom: 15, padding: 10, backgroundColor: '#F1F5F9', borderRadius: 12 },
-  wordBankGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
-  wordBankItem: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  inlineInput: { 
-    minWidth: 120, 
-    borderBottomWidth: 2, 
-    borderBottomColor: '#2563EB', 
-    paddingHorizontal: 12, 
-    marginHorizontal: 4, 
-    height: 40, 
-    backgroundColor:'#EFF6FF', 
-    borderRadius: 8, 
-    marginTop: 4,
-    fontSize: 16,
-    color: '#1E293B',
-    textAlign: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-    textAlignVertical: 'center'
-  },
-  inputCorrect: { backgroundColor: '#D1FAE5', borderBottomColor: '#10B981', color: '#065F46' },
-  inputWrong: { backgroundColor: '#FEE2E2', borderBottomColor: '#EF4444', color: '#B91C1C' },
-
-  // JUMP TO STYLES (Integrated correctly now)
-  jumpToContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  jumpToLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#94A3B8',
-    marginRight: 10,
-    letterSpacing: 0.5,
-  },
-  jumpToScroll: {
-    alignItems: 'center',
-    gap: 10,
-    paddingRight: 20,
-  },
-  jumpCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  jumpCircleActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  jumpCircleText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '700',
-  },
-  jumpCircleTextActive: {
-    color: '#fff',
-  },
-
-  // --- ADD THESE AT THE BOTTOM OF YOUR STYLESHEET ---
-  processingOverlay: {
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Light blur effect
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  processingText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    textAlign: 'center',
-  },
-  processingSubText: {
-    marginTop: 5,
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-
-  // --- ADD THESE TO YOUR STYLESHEET ---
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingBottom: 5,
-  },
-  boldLabel: {
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  boldValue: {
-    fontWeight: 'bold',
-    color: '#2563EB',
-  },
-
-  reOrderResultItem: {
-    marginBottom: 8,
-    padding: 10,
-    backgroundColor: '#F0F9FF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  feedbackOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 100,
-  },
-  feedbackPopup: {
-    width: '90%',
-    padding: 15,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
-    gap: 10,
-  },
-  feedbackText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  dropdownModalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '90%', maxWidth: 400, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5 },
-  dropdownTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 16, textAlign: 'center' },
-  dropdownItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  dropdownItemText: { fontSize: 16, color: '#1E293B', textAlign: 'center' },
-  dropdownCloseBtn: { marginTop: 20, backgroundColor: '#F1F5F9', padding: 14, borderRadius: 12, alignItems: 'center' },
-  dropdownCloseText: { color: '#64748B', fontWeight: 'bold', fontSize: 16 },
-});
-const FeedbackRow = ({label, text, isIncorrect}: {label: string, text: string, isIncorrect?: boolean}) => (
-  <View style={{marginBottom: 8, width: '100%', borderBottomWidth: 1, borderBottomColor: isIncorrect ? '#FECACA' : '#E2E8F0', paddingBottom: 4}}>
-     <Text style={{fontWeight: 'bold', color: isIncorrect ? '#991B1B' : '#1E293B', fontSize: 14}}>{label}</Text>
-     <Text style={{color: isIncorrect ? '#7F1D1D' : '#64748B', fontSize: 13}}>{text}</Text>
-  </View>
-);
+// Styles moved inside component for dynamic theme support

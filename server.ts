@@ -5,14 +5,18 @@ import multer from "multer";
 import cors from "cors";
 import fs from "fs";
 import "dotenv/config";
-import getDailyGoalsHandler from "./api/get_daily_goals.ts";
+import getDailyGoalsHandler from "./api/get_daily_goals.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Forensic path resolution for production
-const distPath = path.resolve(__dirname, "dist");
-const isProd = process.env.NODE_ENV === "production" || fs.existsSync(distPath);
+// Strict production detection
+const isProd = process.env.NODE_ENV === "production";
+
+// In production, the server runs from dist-server/server.js, so we need to look one level up for dist/
+const distPath = isProd 
+  ? path.resolve(__dirname, "..", "dist") 
+  : path.resolve(__dirname, "dist");
 
 async function startServer() {
   const PORT = 3000;
@@ -20,8 +24,13 @@ async function startServer() {
 
   console.log(`[FORENSIC] Booting Server...`);
   console.log(`[FORENSIC] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`[FORENSIC] distPath: ${distPath}`);
   console.log(`[FORENSIC] isProd: ${isProd}`);
+  console.log(`[FORENSIC] distPath: ${distPath}`);
+  console.log(`[FORENSIC] __dirname: ${__dirname}`);
+  
+  if (isProd) {
+     console.log(`[FORENSIC] Checking dist/index.html: ${fs.existsSync(path.join(distPath, "index.html"))}`);
+  }
 
   // 1. TOP-LEVEL ERROR HANDLING (LOG EVERYTHING)
   process.on("uncaughtException", (err) => {

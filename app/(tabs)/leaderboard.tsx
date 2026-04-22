@@ -7,10 +7,12 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { scoreService } from '@/services/scoreService';
 import { networkService } from '@/services/networkService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
+import { useTheme } from '@/context/ThemeContext';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { Image } from 'react-native';
-import CustomLoader from '../../components/CustomLoader';
+import CustomLoader from '@/components/CustomLoader';
+import { LiveSprint } from '@/components/LiveSprint';
 
 interface Lead {
   userId?: string;
@@ -22,6 +24,7 @@ interface Lead {
 export default function Leaderboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const { colors, isDark } = useTheme();
   const [showQR, setShowQR] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -64,6 +67,73 @@ export default function Leaderboard() {
 
     return () => unsubscribe();
   }, []);
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { padding: 20, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    userBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
+    userNameText: { fontSize: 14, fontWeight: 'bold', color: colors.primary },
+    title: { fontSize: 24, fontWeight: 'bold', color: colors.text },
+    subtitle: { fontSize: 14, color: colors.subtext, marginTop: 4 },
+    readOnlyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, alignSelf: 'flex-start' },
+    readOnlyText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold', marginLeft: 4 },
+    
+    actionRow: { flexDirection: 'row', justifyContent: 'space-around', padding: 15, backgroundColor: colors.surface, marginBottom: 10 },
+    actionButton: { alignItems: 'center', gap: 4 },
+    actionText: { fontSize: 12, color: colors.primary, fontWeight: 'bold' },
+  
+    listContent: { padding: 15 },
+    leadRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: 15, borderRadius: 12, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+    rankContainer: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+    rankText: { color: colors.primary, fontWeight: 'bold' },
+    nameContainer: { flex: 1 },
+    nameText: { fontSize: 16, fontWeight: 'bold', color: colors.text },
+    timeText: { fontSize: 12, color: colors.subtext, marginTop: 2 },
+    scoreContainer: { alignItems: 'flex-end' },
+    scoreText: { fontSize: 20, fontWeight: 'bold', color: colors.primary },
+    ptsLabel: { fontSize: 10, color: colors.subtext, fontWeight: 'bold' },
+    emptyText: { textAlign: 'center', marginTop: 40, color: colors.subtext },
+  
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { backgroundColor: colors.surface, padding: 30, borderRadius: 24, alignItems: 'center', width: '80%' },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 20 },
+    qrContainer: { padding: 20, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+    modalDesc: { textAlign: 'center', color: colors.subtext, marginTop: 20, lineHeight: 20 },
+    closeButton: { marginTop: 30, backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 40, borderRadius: 12 },
+    closeButtonText: { color: '#fff', fontWeight: 'bold' },
+  
+    input: {
+      width: '100%',
+      backgroundColor: isDark ? colors.border : '#F1F5F9',
+      padding: 15,
+      borderRadius: 12,
+      marginBottom: 15,
+      fontSize: 16,
+      color: colors.text
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 10,
+      width: '100%'
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center'
+    },
+    modalButtonText: {
+      fontWeight: 'bold',
+      color: '#fff'
+    },
+  
+    scannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+    scannerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
+    scannerFooter: { padding: 40, alignItems: 'center' },
+    scannerDesc: { color: '#fff', textAlign: 'center' }
+  });
 
   const checkNetwork = async () => {
     const ssid = await networkService.getCurrentSSID();
@@ -120,15 +190,21 @@ export default function Leaderboard() {
 
     try {
       await ensureAuth();
-      const userId = `manual_${Math.random().toString(36).substring(7)}`;
+      const currentUid = auth.currentUser?.uid;
+      const isSelf = manualName.trim().toLowerCase() === userName.trim().toLowerCase();
+      
+      const userId = isSelf && currentUid 
+        ? currentUid 
+        : `manual_${Math.random().toString(36).substring(7)}`;
+        
       const userDocRef = doc(db, 'leaderboard', userId);
       
       await setDoc(userDocRef, {
         userId,
-        name: manualName,
+        name: manualName.trim(),
         score: scoreNum,
         lastUpdate: new Date().toISOString()
-      });
+      }, { merge: true });
 
       Alert.alert("Success", `${manualName} added to the leaderboard.`);
       setShowManualEntry(false);
@@ -181,6 +257,13 @@ export default function Leaderboard() {
         </View>
         <Text style={styles.subtitle}>First Attempt Scores Only</Text>
         
+        {currentSSID && (
+          <View style={[styles.userBadge, { marginTop: 8, backgroundColor: colors.primary + '10', alignSelf: 'flex-start' }]}>
+            <MaterialCommunityIcons name="wifi" size={14} color={colors.primary} />
+            <Text style={[styles.userNameText, { fontSize: 12 }]}>Room: {currentSSID}</Text>
+          </View>
+        )}
+        
         {!canEdit && (
           <View style={styles.readOnlyBadge}>
             <MaterialCommunityIcons name="lock" size={14} color="#EF4444" />
@@ -219,6 +302,7 @@ export default function Leaderboard() {
           renderItem={renderLead}
           keyExtractor={(item) => item.userId || item.name}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={<LiveSprint />}
           ListEmptyComponent={
             <Text style={styles.emptyText}>No students on the leaderboard yet.</Text>
           }
@@ -307,69 +391,4 @@ export default function Leaderboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  userBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
-  userNameText: { fontSize: 14, fontWeight: 'bold', color: '#2563EB' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#1E293B' },
-  subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
-  readOnlyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, alignSelf: 'flex-start' },
-  readOnlyText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold', marginLeft: 4 },
-  
-  actionRow: { flexDirection: 'row', justifyContent: 'space-around', padding: 15, backgroundColor: '#fff', marginBottom: 10 },
-  actionButton: { alignItems: 'center', gap: 4 },
-  actionText: { fontSize: 12, color: '#2563EB', fontWeight: 'bold' },
-
-  listContent: { padding: 15 },
-  leadRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
-  rankContainer: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  rankText: { color: '#2563EB', fontWeight: 'bold' },
-  nameContainer: { flex: 1 },
-  nameText: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
-  timeText: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  scoreContainer: { alignItems: 'flex-end' },
-  scoreText: { fontSize: 20, fontWeight: 'bold', color: '#2563EB' },
-  ptsLabel: { fontSize: 10, color: '#64748B', fontWeight: 'bold' },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#64748B' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 30, borderRadius: 24, alignItems: 'center', width: '80%' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 20 },
-  qrContainer: { padding: 20, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  modalDesc: { textAlign: 'center', color: '#64748B', marginTop: 20, lineHeight: 20 },
-  closeButton: { marginTop: 30, backgroundColor: '#2563EB', paddingVertical: 12, paddingHorizontal: 40, borderRadius: 12 },
-  closeButtonText: { color: '#fff', fontWeight: 'bold' },
-
-  input: {
-    width: '100%',
-    backgroundColor: '#F1F5F9',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-    fontSize: 16,
-    color: '#1E293B'
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-    width: '100%'
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  modalButtonText: {
-    fontWeight: 'bold',
-    color: '#fff'
-  },
-
-  scannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  scannerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  scannerFooter: { padding: 40, alignItems: 'center' },
-  scannerDesc: { color: '#fff', textAlign: 'center' }
-});
+// Replaced by dynamic styles

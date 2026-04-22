@@ -7,13 +7,26 @@ import { scoreService } from '@/services/scoreService';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 
 function RootLayoutContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
   useEffect(() => {
+    // Check Subscription Status on App Open
+    const checkSubscription = async () => {
+      const { daysRemaining } = await scoreService.getSubscriptionStatus();
+      if (daysRemaining <= 3) {
+        Alert.alert(
+          "Subscription Alert",
+          `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
+          [{ text: "OK" }]
+        );
+      }
+    };
+    checkSubscription();
+
     // Listen for Global Reset Signal
     const unsubscribe = onSnapshot(doc(db, 'config', 'reset'), async (snapshot: any) => {
       if (snapshot.exists()) {
