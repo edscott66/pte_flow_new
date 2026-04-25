@@ -9,7 +9,7 @@ import { networkService } from '@/services/networkService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/context/ThemeContext';
 import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, limit, where, deleteDoc } from 'firebase/firestore';
 import { Image } from 'react-native';
 import CustomLoader from '@/components/CustomLoader';
 import { LiveSprint } from '@/components/LiveSprint';
@@ -27,45 +27,85 @@ export default function Leaderboard() {
   const { colors, isDark } = useTheme();
   const [showQR, setShowQR] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const [manualName, setManualName] = useState('');
-  const [manualScore, setManualScore] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
   const [canEdit, setCanEdit] = useState(true);
   const [currentSSID, setCurrentSSID] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [myGroupId, setMyGroupId] = useState<string | null>(null);
+
+  const [isResetActive, setIsResetActive] = useState(false);
+  const [hasCheckedReset, setHasCheckedReset] = useState(false);
 
   useEffect(() => {
     checkNetwork();
     scoreService.getUserName().then(name => setUserName(name || 'Student'));
-
-    // Real-time Firebase listener
-    setLoading(true);
-    const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(50));
     
-    const unsubscribe = onSnapshot(q, (snapshot: any) => {
-      const rawData = snapshot.docs.map((doc: any) => ({
-        userId: doc.id,
-        ...doc.data()
-      })) as Lead[];
-      
-      // Deduplicate by name, keeping highest score
-      const uniqueLeads: Record<string, Lead> = {};
-      rawData.forEach(lead => {
-        if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
-          uniqueLeads[lead.name] = lead;
-        }
-      });
-      
-      const sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
-      setLeads(sortedLeads);
-      setLoading(false);
-    }, (error: any) => {
-      handleFirestoreError(error, OperationType.LIST, 'leaderboard');
-      setLoading(false);
-    });
+    let unsubscribe: any;
 
-    return () => unsubscribe();
+    const setupListener = async () => {
+      setLoading(true);
+      const uid = await AsyncStorage.getItem('pte_flow_user_id');
+      setCurrentUserId(uid);
+
+      const resetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
+      setIsResetActive(resetMode === 'true');
+      setHasCheckedReset(true);
+      
+      let groupId = await scoreService.getGroupId();
+      if (!groupId && uid) {
+        groupId = uid;
+        await scoreService.setGroupId(uid);
+      }
+      setMyGroupId(groupId);
+
+      if (!groupId) {
+        setLoading(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'leaderboard'),
+        where('groupId', '==', groupId)
+      );
+      
+      unsubscribe = onSnapshot(q, async (snapshot: any) => {
+        const rawData = snapshot.docs.map((doc: any) => ({
+          userId: doc.id,
+          ...doc.data()
+        })) as Lead[];
+        
+        // Deduplicate by name, keeping highest score
+        const uniqueLeads: Record<string, Lead> = {};
+        rawData.forEach(lead => {
+          if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
+            uniqueLeads[lead.name] = lead;
+          }
+        });
+        
+        let sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
+        
+        // APPLY RESET FILTERS
+        // If reset is active, user ONLY sees themselves (with 0 score which is already set in DB)
+        const currentResetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
+        if (currentResetMode === 'true' && uid) {
+          sortedLeads = sortedLeads.filter(l => l.userId === uid);
+        }
+
+        setLeads(sortedLeads);
+        setLoading(false);
+      }, (error: any) => {
+        // If index errors or network errors occur
+        handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+        setLoading(false);
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const styles = StyleSheet.create({
@@ -164,56 +204,74 @@ export default function Leaderboard() {
 
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     setShowScanner(false);
-    // In a real app, 'data' would be the Host's IP or a Group Token
-    // For this applet, scanning simply "joins" the global leaderboard
-    Alert.alert("Joined!", "You have successfully joined the leaderboard group.");
     
-    // Set current SSID as original if not set
-    const original = await scoreService.getOriginalSSID();
-    if (!original && currentSSID) {
-      await scoreService.setOriginalSSID(currentSSID);
-      setCanEdit(true);
+    if (data.startsWith('pteflow-group:')) {
+      const scannedGroupId = data.split(':')[1];
+      if (scannedGroupId) {
+        // Clear the reset mode locally since joining a group re-enables normal functionality
+        await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'false');
+        setIsResetActive(false);
+
+        await scoreService.setGroupId(scannedGroupId);
+        setMyGroupId(scannedGroupId);
+        
+        // Update user's firebase document to join the group
+        if (currentUserId && userName) {
+          try {
+            await ensureAuth();
+            const userDocRef = doc(db, 'leaderboard', currentUserId);
+            // Don't reset score here! 'Points are only awarded once a group is formed.'
+            // If they had 0, they keep 0, but now they are in a group so future points count here too.
+            await setDoc(userDocRef, {
+              groupId: scannedGroupId,
+              lastUpdate: new Date().toISOString()
+            }, { merge: true });
+          } catch (e) {
+            console.error("Failed to join group in firebase", e);
+          }
+        }
+
+        Alert.alert("Joined!", "You and the other user are now mutually on the same Global Leaderboard.");
+        // We might want to force a refresh, but the onSnapshot listener will re-run when component re-mounts
+        // or we could trigger a re-fetch.
+      } else {
+        Alert.alert("Invalid QR", "This QR code doesn't contain a valid group.");
+      }
+    } else {
+      Alert.alert("Invalid QR", "Please scan a PTE Flow group QR code.");
     }
   };
 
-  const handleManualSubmit = async () => {
-    if (!manualName.trim() || !manualScore.trim()) {
-      Alert.alert("Error", "Please enter both name and score.");
-      return;
-    }
+  const handleLeaveGroup = async (itemUserId: string) => {
+    if (itemUserId !== currentUserId) return;
+    
+    Alert.alert(
+      "Leave Group",
+      "Are you sure you want to leave the group?",
+      [
+        { text: "No", style: "cancel" },
+        { 
+          text: "Yes", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await ensureAuth();
+              await deleteDoc(doc(db, 'leaderboard', itemUserId));
+              
+              // Local reset of group/score if desired so they don't immediately rejoin with points
+              await scoreService.setScore(0); 
+              await scoreService.setGroupId(itemUserId); // Back to private
+              setMyGroupId(itemUserId);
 
-    const scoreNum = parseInt(manualScore);
-    if (isNaN(scoreNum)) {
-      Alert.alert("Error", "Score must be a number.");
-      return;
-    }
-
-    try {
-      await ensureAuth();
-      const currentUid = auth.currentUser?.uid;
-      const isSelf = manualName.trim().toLowerCase() === userName.trim().toLowerCase();
-      
-      const userId = isSelf && currentUid 
-        ? currentUid 
-        : `manual_${Math.random().toString(36).substring(7)}`;
-        
-      const userDocRef = doc(db, 'leaderboard', userId);
-      
-      await setDoc(userDocRef, {
-        userId,
-        name: manualName.trim(),
-        score: scoreNum,
-        lastUpdate: new Date().toISOString()
-      }, { merge: true });
-
-      Alert.alert("Success", `${manualName} added to the leaderboard.`);
-      setShowManualEntry(false);
-      setManualName('');
-      setManualScore('');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'leaderboard/manual');
-      Alert.alert("Error", "Could not add user to leaderboard.");
-    }
+              Alert.alert("Left Group", "You have successfully removed your name from the Global Leaderboard.");
+            } catch (error) {
+              console.error("Failed to leave group:", error);
+              Alert.alert("Error", "Could not remove your name.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderLead = ({ item, index }: { item: Lead, index: number }) => {
@@ -227,8 +285,11 @@ export default function Leaderboard() {
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const year = dateObj.getFullYear();
     const formattedDate = `${day} / ${month} / ${year}`;
+    
+    // Only wrap in TouchableOpacity if it's the current user
+    const isSelf = item.userId === currentUserId;
 
-    return (
+    const Content = (
       <View style={[styles.leadRow, { backgroundColor: bgColor }]}>
         <View style={styles.rankContainer}>
           <Text style={styles.rankText}>{index + 1}</Text>
@@ -243,6 +304,16 @@ export default function Leaderboard() {
         </View>
       </View>
     );
+
+    if (isSelf && item.userId) {
+      return (
+        <TouchableOpacity onLongPress={() => handleLeaveGroup(item.userId!)} delayLongPress={800} activeOpacity={0.7}>
+          {Content}
+        </TouchableOpacity>
+      );
+    }
+
+    return Content;
   };
 
   return (
@@ -287,11 +358,6 @@ export default function Leaderboard() {
           <MaterialCommunityIcons name="refresh" size={24} color="#2563EB" />
           <Text style={styles.actionText}>Refresh</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => setShowManualEntry(true)}>
-          <MaterialCommunityIcons name="account-plus" size={24} color="#2563EB" />
-          <Text style={styles.actionText}>Add User</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -304,50 +370,19 @@ export default function Leaderboard() {
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={<LiveSprint />}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No students on the leaderboard yet.</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.emptyText}>
+                {isResetActive ? "The leaderboard has been reset." : "No students on the leaderboard yet."}
+              </Text>
+              {isResetActive && (
+                <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }]}>
+                  Scan a QR code or form a group to resume normal competition.
+                </Text>
+              )}
+            </View>
           }
         />
       )}
-
-      {/* Manual Entry Modal */}
-      <Modal visible={showManualEntry} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Manual Entry</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="User Name"
-              value={manualName}
-              onChangeText={setManualName}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Score (0-90)"
-              value={manualScore}
-              onChangeText={setManualScore}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#E2E8F0' }]} 
-                onPress={() => setShowManualEntry(false)}
-              >
-                <Text style={[styles.modalButtonText, { color: '#1E293B' }]}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#2563EB' }]} 
-                onPress={handleManualSubmit}
-              >
-                <Text style={styles.modalButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* QR Modal */}
       <Modal visible={showQR} transparent animationType="fade">
@@ -356,7 +391,7 @@ export default function Leaderboard() {
             <Text style={styles.modalTitle}>Join My Group</Text>
             <View style={styles.qrContainer}>
               <Image 
-                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pte-flow-join-${encodeURIComponent(userName)}` }}
+                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pteflow-group:${myGroupId || currentUserId}` }}
                 style={{ width: 200, height: 200 }}
                 referrerPolicy="no-referrer"
               />

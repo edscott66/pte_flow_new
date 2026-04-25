@@ -1,7 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-import * as FirebaseAuth from 'firebase/auth';
-const { initializeAuth, getAuth, signInAnonymously, getReactNativePersistence } = FirebaseAuth as any;
+import { 
+  getAuth, 
+  signInAnonymously, 
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  initializeAuth,
+} from 'firebase/auth';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import firebaseConfig from './firebase-applet-config.json';
 import { Platform } from 'react-native';
@@ -10,28 +16,66 @@ import { Platform } from 'react-native';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
+const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+
 // Initialize Auth with platform-specific persistence
 let authInstance;
 
-if (Platform.OS === 'web') {
+if (isWeb) {
   authInstance = getAuth(app);
 } else {
+  // Use dynamic logic to find getReactNativePersistence to avoid bundling errors on web
+  let reactNativePersistence: any = null;
   try {
-    if (getReactNativePersistence) {
-      authInstance = initializeAuth(app, {
-        persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-      });
-    } else {
-      console.warn("getReactNativePersistence is not available, falling back to default.");
-      authInstance = getAuth(app);
+    // In Firebase 11, it might be in the main package or a subpath
+    // We try to access it safely
+    const authModule: any = require('firebase/auth');
+    reactNativePersistence = authModule.getReactNativePersistence;
+    
+    if (!reactNativePersistence && authModule.default) {
+      reactNativePersistence = authModule.default.getReactNativePersistence;
     }
   } catch (e) {
-    console.warn("Native persistence initialization failed, falling back to default.", e);
+    console.log("Firebase persistence resolution effort: ", e);
+  }
+
+  if (reactNativePersistence) {
+    try {
+      authInstance = initializeAuth(app, {
+        persistence: reactNativePersistence(ReactNativeAsyncStorage)
+      });
+    } catch (e) {
+      console.warn("Native persistence initialization failed, falling back to default.", e);
+      authInstance = getAuth(app);
+    }
+  } else {
     authInstance = getAuth(app);
   }
 }
 
 export const auth = authInstance;
+
+export const signInWithGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    if (typeof signInWithPopup !== 'function') {
+      throw new Error("signInWithPopup is not available in this environment.");
+    }
+    const result = await signInWithPopup(auth, provider);
+    return result;
+  } catch (error) {
+    console.error("Google Sign In failed:", error);
+    if (typeof signInWithRedirect === 'function') {
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectError) {
+        console.error("Google Sign In Redirect failed:", redirectError);
+      }
+    } else {
+      console.warn("signInWithRedirect is also not available.");
+    }
+  }
+};
 
 // Error handling helper
 export enum OperationType {

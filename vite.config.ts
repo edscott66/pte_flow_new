@@ -16,18 +16,23 @@ export default defineConfig(({ mode }) => {
       {
         name: 'load-js-as-jsx',
         async transform(code, id) {
-          if (id.includes('node_modules/expo-router') && id.endsWith('.js')) {
+          if (id.includes('node_modules') && id.endsWith('.js')) {
+            // Some RN libraries use Flow or JSX in .js files
             // @ts-ignore
             const { transform } = await import('esbuild');
-            const result = await transform(code, {
-              loader: 'jsx',
-              format: 'esm',
-              sourcemap: true,
-            });
-            return {
-              code: result.code,
-              map: result.map ? JSON.parse(result.map) : null,
-            };
+            try {
+              const result = await transform(code, {
+                loader: 'tsx',
+                format: 'esm',
+                sourcemap: true,
+              });
+              return {
+                code: result.code,
+                map: result.map ? JSON.parse(result.map) : null,
+              };
+            } catch (e) {
+              return null;
+            }
           }
         },
       }
@@ -39,16 +44,33 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        'react-native/Libraries/Utilities/codegenNativeComponent': path.resolve(__dirname, 'empty-module.js'),
+        'react-native/Libraries/Utilities/codegenNativeCommands': path.resolve(__dirname, 'empty-module.js'),
+        'react-native/Libraries/ReactNative/AppContainer': path.resolve(__dirname, 'empty-module.js'),
+        'react-native/Libraries/Image/AssetRegistry': path.resolve(__dirname, 'empty-module.js'),
+        '@react-native/assets-registry/registry': path.resolve(__dirname, 'empty-module.js'),
         'react-native': 'react-native-web',
       },
       extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js'],
     },
     optimizeDeps: {
       esbuildOptions: {
+        alias: {
+          'react-native/Libraries/Utilities/codegenNativeComponent': path.resolve(__dirname, 'empty-module.js'),
+          'react-native/Libraries/Utilities/codegenNativeCommands': path.resolve(__dirname, 'empty-module.js'),
+          'react-native/Libraries/ReactNative/AppContainer': path.resolve(__dirname, 'empty-module.js'),
+          'react-native/Libraries/Image/AssetRegistry': path.resolve(__dirname, 'empty-module.js'),
+          '@react-native/assets-registry/registry': path.resolve(__dirname, 'empty-module.js'),
+          'react-native': 'react-native-web',
+        },
         loader: {
-          '.js': 'jsx',
+          '.js': 'tsx',
         },
       },
+    },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
     },
     server: {
       port: 3000,

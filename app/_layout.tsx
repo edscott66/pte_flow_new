@@ -40,11 +40,14 @@ function RootLayoutContent() {
           // Check if we are already logged in
           const name = await scoreService.getUserName();
           if (name) {
+            // Set flag to hide other users on leaderboard until a new group is joined
+            await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'true');
+            
             Alert.alert(
-              "Group Reset",
-              "The group creator has reset this session. Your local data has been cleared.",
+              "Leaderboard Reset",
+              data.message || "The leaderboard has been reset by the admin. Your score has been cleared, and you will only see your own progress until you join a new group.",
               [{ text: "OK", onPress: async () => {
-                await scoreService.clearAllLocalData();
+                await scoreService.resetLeaderboardScore();
                 router.replace('/');
               }}]
             );

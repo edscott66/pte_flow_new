@@ -35,21 +35,23 @@ service cloud.firestore {
              data.timeTaken is number && data.timeTaken >= 0 && data.timeTaken <= 3000;
     }
 
+    function isAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email == 'projectgazzy@gmail.com' && 
+             request.auth.token.email_verified == true;
+    }
+
     // Leaderboard
     match /leaderboard/{userId} {
       allow read: if true;
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || userId.startsWith('manual_'));
-      allow update: if isSignedIn() && (request.auth.uid == userId || userId.startsWith('manual_'));
-    }
-
-    // Connection test path
-    match /test/connection {
-      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn(); 
     }
 
     // Config (Global Reset)
     match /config/reset {
       allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // Sprints

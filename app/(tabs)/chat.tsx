@@ -10,12 +10,15 @@ import {
   Platform,
   ActivityIndicator,
   SafeAreaView,
-  Keyboard
+  Keyboard,
+  Switch
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { getPTEChatResponse } from '../../services/geminiService';
+import { getPTEChatResponse, synthesizeSpeech } from '../../services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
+import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Message {
   id: string;
@@ -36,7 +39,59 @@ export default function ChatScreen() {
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAutoRead, setIsAutoRead] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    const loadPrefs = async () => {
+      const autoRead = await AsyncStorage.getItem('pte_chat_auto_read');
+      if (autoRead !== null) {
+        setIsAutoRead(autoRead === 'true');
+      }
+    };
+    loadPrefs();
+  }, []);
+
+  const toggleAutoRead = async (value: boolean) => {
+    setIsAutoRead(value);
+    await AsyncStorage.setItem('pte_chat_auto_read', value.toString());
+    if (!value) {
+      stopAudio();
+    }
+  };
+
+  const stopAudio = async () => {
+    if (sound) {
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      } catch (e) {}
+      setSound(null);
+    }
+  };
+
+  const playTTS = async (text: string) => {
+    try {
+      await stopAudio();
+      const uri = await synthesizeSpeech(text);
+      if (uri) {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true }
+        );
+        setSound(newSound);
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            newSound.unloadAsync();
+            setSound(null);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('TTS Playback error:', error);
+    }
+  };
 
   const handleSend = async () => {
     if (inputText.trim() === '' || isLoading) return;
@@ -69,6 +124,10 @@ export default function ChatScreen() {
       };
 
       setMessages((prev) => [...prev, botMessage]);
+
+      if (isAutoRead) {
+        playTTS(aiResponse);
+      }
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
@@ -89,6 +148,9 @@ export default function ChatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
+    return () => {
+      stopAudio();
+    };
   }, [messages, isLoading]);
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -119,14 +181,28 @@ export default function ChatScreen() {
           >
             {item.content}
           </Text>
-          <Text
-            style={[
-              styles.timestamp,
-              { color: isBot ? colors.subtext : 'rgba(255, 255, 255, 0.7)' },
-            ]}
-          >
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 4 }}>
+            <Text
+              style={[
+                styles.timestamp,
+                { color: isBot ? colors.subtext : 'rgba(255, 255, 255, 0.7)', marginTop: 0 }
+              ]}
+            >
+              {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            {isBot && (
+              <TouchableOpacity 
+                onPress={() => playTTS(item.content)}
+                style={{ marginLeft: 8 }}
+              >
+                <MaterialCommunityIcons 
+                  name="volume-high" 
+                  size={16} 
+                  color={colors.primary} 
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -139,7 +215,7 @@ export default function ChatScreen() {
     },
     header: {
       paddingHorizontal: 20,
-      paddingVertical: 15,
+      paddingVertical: 20,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
@@ -185,8 +261,20 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <View style={dynamicStyles.header}>
-        <Ionicons name="chatbubble-ellipses" size={24} color={colors.primary} />
-        <Text style={dynamicStyles.headerTitle}>AI PTE Coach</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Ionicons name="chatbubble-ellipses" size={24} color={colors.primary} />
+          <Text style={dynamicStyles.headerTitle}>AI PTE Coach</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize: 12, color: colors.subtext, marginRight: 8, fontWeight: '500' }}>Auto-Read</Text>
+          <Switch
+            value={isAutoRead}
+            onValueChange={toggleAutoRead}
+            trackColor={{ false: '#CBD5E1', true: colors.primary }}
+            ios_backgroundColor="#CBD5E1"
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          />
+        </View>
       </View>
 
       <KeyboardAvoidingView

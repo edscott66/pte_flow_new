@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { doc, setDoc, getDocs, query, collection, where, limit, orderBy, deleteDoc } from 'firebase/firestore';
 import { useTheme } from '@/context/ThemeContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function WelcomeScreen() {
 
     if (savedName) {
       // Even if logged in, sync with leaderboard to ensure name is there
-      syncWithLeaderboard(savedName);
+      await syncWithLeaderboard(savedName);
       router.replace('/(tabs)');
     }
     setLoading(false);
@@ -108,10 +109,18 @@ export default function WelcomeScreen() {
             await AsyncStorage.setItem('pte_flow_user_id', userId);
         }
 
+        let groupId = await scoreService.getGroupId();
+        
+        if (!groupId) {
+          groupId = userId;
+          await scoreService.setGroupId(userId);
+        }
+
         await setDoc(userDocRef, {
           userId,
           name: userName,
           score: currentScore,
+          groupId: groupId,
           attemptedQuestions: attempted,
           lastUpdate: new Date().toISOString()
         }, { merge: true });
@@ -178,7 +187,9 @@ export default function WelcomeScreen() {
           transform: [{ scale: pulseAnim }],
           opacity: opacityAnim,
           borderWidth: 3,
-          borderColor: '#c09c32'
+          borderColor: '#c09c32',
+          justifyContent: 'center',
+          alignItems: 'center',
         }]}>
           <Image
             source={require('../assets/images/BBLPTF.png')}

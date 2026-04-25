@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "pte-flow",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -17,7 +18,6 @@
     },
     "plugins": [
       "expo-router"
-    ],
-    "scheme": "pte-flow"
+    ]
   }
 }

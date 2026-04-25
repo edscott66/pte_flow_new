@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, Switch, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, Switch, Linking, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '@/services/scoreService';
-import { db, ensureAuth } from '@/services/firebase';
+import { db, ensureAuth, signInWithGoogle, auth } from '@/services/firebase';
 import { API_BASE_URL } from '@/constants/config';
-import { collection, getDocs, deleteDoc, doc, setDoc } from 'firebase/firestore';
-import { useRouter } from 'expo-router';
+import { collection, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import CustomLoader from '@/components/CustomLoader';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -21,15 +22,19 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { colors, toggleTheme, theme, isDark } = useTheme();
 
-  useEffect(() => {
-    scoreService.getIsCreator().then(setIsCreator);
-    
-    // Load Subscription Details
-    const loadSubscription = async () => {
-      const details = await scoreService.getSubscriptionStatus();
-      setSubscriptionDetails(details);
-    };
+  useFocusEffect(
+    useCallback(() => {
+      scoreService.getIsCreator().then(setIsCreator);
+      
+      const loadSubscription = async () => {
+        const details = await scoreService.getSubscriptionStatus();
+        setSubscriptionDetails(details);
+      };
+      loadSubscription();
+    }, [])
+  );
 
+  useEffect(() => {
     const loadPrefs = async () => {
       const enabled = await AsyncStorage.getItem('pte_reminders_enabled');
       const time = await AsyncStorage.getItem('pte_reminder_time');
@@ -39,7 +44,6 @@ export default function SettingsScreen() {
       if (voice) setCoachVoice(voice);
     };
 
-    loadSubscription();
     loadPrefs();
   }, []);
 
@@ -95,38 +99,58 @@ export default function SettingsScreen() {
   const handleGlobalReset = async () => {
     Alert.alert(
       "CRITICAL ACTION",
-      "This will delete ALL student scores from the cloud and reset the app for EVERYONE in this group. This cannot be undone.",
+      "This will reset ALL student scores to zero on the global leaderboard. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         { 
-          text: "DELETE EVERYTHING", 
+          text: "RESET ALL SCORES", 
           style: "destructive",
           onPress: async () => {
-            setLoading(true);
             try {
-              await ensureAuth();
+              setLoading(true);
               
-              // 1. Delete all leaderboard docs in cloud
+              // 1. Reset all leaderboard docs in cloud to 0 points
               const q = collection(db, 'leaderboard');
               const snapshot = await getDocs(q);
               
-              const deletePromises = snapshot.docs.map((d: any) => deleteDoc(doc(db, 'leaderboard', d.id)));
-              await Promise.all(deletePromises);
+              const resetTime = new Date().toISOString();
+              const updatePromises = snapshot.docs.map(d => updateDoc(doc(db, 'leaderboard', d.id), { 
+                score: 0, 
+                lastUpdate: resetTime,
+                // Explicitly marks that this user was affected by the reset
+                wasReset: true 
+              }));
+              await Promise.all(updatePromises);
               
-              // 2. Send Global Reset Signal
+              // 2. Local State Management for admin
+              await AsyncStorage.setItem('pte_flow_last_reset', resetTime);
+              await scoreService.resetLeaderboardScore();
+
+              // 3. Specifically ensure current user's doc is 0 in cloud too
+              if (auth.currentUser?.uid) {
+                await setDoc(doc(db, 'leaderboard', auth.currentUser.uid), {
+                  score: 0,
+                  lastUpdate: resetTime,
+                  wasReset: true
+                }, { merge: true });
+              }
+
+              // 4. Send Global Reset Signal (triggers reset for all other active users)
               await setDoc(doc(db, 'config', 'reset'), {
-                timestamp: new Date().toISOString(),
-                reason: 'admin_wipe'
+                timestamp: resetTime,
+                reason: 'admin_wipe',
+                adminId: auth.currentUser?.uid || 'admin',
+                message: "The leaderboard has been reset by the admin. Your score and ranking have been cleared."
               });
               
-              // 3. Clear local data for the creator
-              await scoreService.clearAllLocalData();
-              
-              Alert.alert("Success", "Group data has been wiped. The app will now restart.");
-              router.replace('/');
+              Alert.alert(
+                "Success", 
+                "Global Leaderboard has been reset to zero. Your personal progress report and name have been preserved. The app will now restart.",
+                [{ text: "OK", onPress: () => router.replace('/') }]
+              );
             } catch (error) {
               console.error("Global reset failed:", error);
-              Alert.alert("Error", "Failed to wipe cloud data. Please check your connection.");
+              Alert.alert("Error", "Failed to reset cloud data. Please check your connection.");
             } finally {
               setLoading(false);
             }
@@ -151,6 +175,34 @@ export default function SettingsScreen() {
         }
       ]
     );
+  };
+
+  const [tapCount, setTapCount] = useState(0);
+  const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
+
+  const handleVersionTap = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+    if (newCount >= 7) {
+      setTapCount(0);
+      setAdminModalVisible(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  const handleAdminVerify = async () => {
+    if (adminCode === 'BIGBEN2026') {
+      await scoreService.setIsCreator(true);
+      setIsCreator(true);
+      setAdminModalVisible(false);
+      setAdminCode('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Success", "Administrative Controls Unlocked.");
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Error", "Invalid access code.");
+    }
   };
 
   const dynamicStyles = StyleSheet.create({
@@ -191,6 +243,16 @@ export default function SettingsScreen() {
     footer: { padding: 40, alignItems: 'center' },
     version: { fontSize: 12, fontWeight: 'bold', color: colors.border },
     copyright: { fontSize: 10, color: colors.border, marginTop: 4 },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { width: '100%', maxWidth: 340, backgroundColor: colors.surface, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8, textAlign: 'center' },
+    modalDesc: { fontSize: 14, color: colors.subtext, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+    modalInput: { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 12, padding: 16, color: colors.text, fontSize: 16, marginBottom: 20, textAlign: 'center', borderWidth: 1, borderColor: colors.border },
+    modalButtons: { flexDirection: 'row', gap: 12 },
+    modalButton: { flex: 1, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    modalButtonText: { fontSize: 15, fontWeight: 'bold' },
   });
 
   return (
@@ -363,11 +425,11 @@ export default function SettingsScreen() {
               disabled={loading}
             >
               <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#FEE2E2' }]}>
-                <MaterialCommunityIcons name="delete-forever" size={24} color={colors.danger} />
+                <MaterialCommunityIcons name="refresh-circle" size={24} color={colors.danger} />
               </View>
               <View style={dynamicStyles.itemText}>
-                <Text style={[dynamicStyles.itemTitle, { color: isDark ? colors.danger : '#B91C1C' }]}>Wipe Global Group Data</Text>
-                <Text style={dynamicStyles.itemDesc}>Delete ALL student scores from the cloud.</Text>
+                <Text style={[dynamicStyles.itemTitle, { color: isDark ? colors.danger : '#B91C1C' }]}>Reset Global Leaderboard</Text>
+                <Text style={dynamicStyles.itemDesc}>Set ALL student scores to zero on the cloud.</Text>
               </View>
               {loading ? (
                 <CustomLoader size={30} />
@@ -383,10 +445,55 @@ export default function SettingsScreen() {
         )}
 
         <View style={dynamicStyles.footer}>
-          <Text style={dynamicStyles.version}>PTE Flow v1.0.0</Text>
+          <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
+            <Text style={dynamicStyles.version}>PTE Flow v1.0.0</Text>
+          </TouchableOpacity>
           <Text style={dynamicStyles.copyright}>© 2026 PTE Flow Team</Text>
         </View>
       </ScrollView>
+
+      {/* Cross-platform Admin Unlock Modal */}
+      <Modal
+        visible={adminModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAdminModalVisible(false)}
+      >
+        <View style={dynamicStyles.modalOverlay}>
+          <View style={dynamicStyles.modalContent}>
+            <Text style={dynamicStyles.modalTitle}>Admin Access</Text>
+            <Text style={dynamicStyles.modalDesc}>Enter the management access code to unlock administrative controls.</Text>
+            
+            <TextInput
+              style={dynamicStyles.modalInput}
+              placeholder="Enter Code"
+              placeholderTextColor={colors.subtext}
+              secureTextEntry
+              value={adminCode}
+              onChangeText={setAdminCode}
+              autoFocus
+            />
+
+            <View style={dynamicStyles.modalButtons}>
+              <TouchableOpacity 
+                style={[dynamicStyles.modalButton, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]} 
+                onPress={() => { setAdminModalVisible(false); setAdminCode(''); }}
+              >
+                <Text style={[dynamicStyles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[dynamicStyles.modalButton, { backgroundColor: colors.primary }]} 
+                onPress={handleAdminVerify}
+              >
+                <Text style={[dynamicStyles.modalButtonText, { color: '#fff' }]}>Unlock</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({}); // Placeholder if needed

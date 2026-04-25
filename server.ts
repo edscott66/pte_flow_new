@@ -5,18 +5,16 @@ import multer from "multer";
 import cors from "cors";
 import fs from "fs";
 import "dotenv/config";
-import getDailyGoalsHandler from "./api/get_daily_goals.js";
+import getDailyGoalsHandler from "./api/get_daily_goals";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Strict production detection
+const distPath = path.resolve(process.cwd(), "dist");
+// Only trust isProd if NODE_ENV is production OR if it's explicitly set.
+// Avoid defaulting to Prod just because a dist folder exists if we are clearly in dev.
 const isProd = process.env.NODE_ENV === "production";
-
-// In production, the server runs from dist-server/server.js, so we need to look one level up for dist/
-const distPath = isProd 
-  ? path.resolve(__dirname, "..", "dist") 
-  : path.resolve(__dirname, "dist");
 
 async function startServer() {
   const PORT = 3000;
@@ -25,11 +23,35 @@ async function startServer() {
   console.log(`[FORENSIC] Booting Server...`);
   console.log(`[FORENSIC] NODE_ENV: ${process.env.NODE_ENV}`);
   console.log(`[FORENSIC] isProd: ${isProd}`);
+  console.log(`[FORENSIC] process.cwd(): ${process.cwd()}`);
   console.log(`[FORENSIC] distPath: ${distPath}`);
-  console.log(`[FORENSIC] __dirname: ${__dirname}`);
+
+  const indexHTMLPath = path.join(distPath, "index.html");
+  const indexExists = fs.existsSync(indexHTMLPath);
+  console.log(`[FORENSIC] Checking ${indexHTMLPath}: ${indexExists}`);
   
-  if (isProd) {
-     console.log(`[FORENSIC] Checking dist/index.html: ${fs.existsSync(path.join(distPath, "index.html"))}`);
+  if (isProd && !indexExists) {
+    console.warn(`[WARNING] isProd is true but index.html missing at ${indexHTMLPath}`);
+  }
+
+  // 1. Leaderboard logic (Moved up to prevent ReferenceError in routes)
+  const LEADS_FILE = isProd ? "/tmp/leaderboard.json" : path.join(process.cwd(), "leaderboard.json");
+  let leaderboard: Record<string, { name: string, score: number, lastUpdate: string }> = {};
+
+  const saveLeaderboard = () => {
+    try {
+      fs.writeFileSync(LEADS_FILE, JSON.stringify(leaderboard, null, 2));
+    } catch (err) {
+      console.error("[Leaderboard] Save failure:", err);
+    }
+  };
+
+  try {
+    if (fs.existsSync(LEADS_FILE)) {
+      leaderboard = JSON.parse(fs.readFileSync(LEADS_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.error("[Leaderboard] Load failure:", err);
   }
 
   // 1. TOP-LEVEL ERROR HANDLING (LOG EVERYTHING)
@@ -83,36 +105,6 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // 4.5 CATCH-ALL API (Prevent fallthrough to SPA index.html)
-  app.all("/api/*", (req, res) => {
-    console.warn(`[API_MISS] No route matched for: ${req.method} ${req.url}`);
-    res.status(404).json({ 
-      error: "API endpoint not found",
-      method: req.method,
-      path: req.url 
-    });
-  });
-
-  // 5. Leaderboard logic
-  const LEADS_FILE = path.join(process.cwd(), "leaderboard.json");
-  let leaderboard: Record<string, { name: string, score: number, lastUpdate: string }> = {};
-
-  const saveLeaderboard = () => {
-    try {
-      fs.writeFileSync(LEADS_FILE, JSON.stringify(leaderboard, null, 2));
-    } catch (err) {
-      console.error("[Leaderboard] Save failure:", err);
-    }
-  };
-
-  try {
-    if (fs.existsSync(LEADS_FILE)) {
-      leaderboard = JSON.parse(fs.readFileSync(LEADS_FILE, "utf-8"));
-    }
-  } catch (err) {
-    console.error("[Leaderboard] Load failure:", err);
-  }
-
   // 6. Gemini Proxy
   app.post("/api/ai/gemini", async (req: Request, res: Response) => {
     try {
@@ -130,6 +122,16 @@ async function startServer() {
     } catch (error) {
       res.status(500).json({ error: "Gemini error" });
     }
+  });
+
+  // 4.5 CATCH-ALL API (Prevent fallthrough to SPA index.html)
+  app.all("/api/*", (req, res) => {
+    console.warn(`[API_MISS] No route matched for: ${req.method} ${req.url}`);
+    res.status(404).json({ 
+      error: "API endpoint not found",
+      method: req.method,
+      path: req.url 
+    });
   });
 
   // 7. ENVIRONMENT-SPECIFIC MIDDLEWARE
@@ -151,7 +153,12 @@ async function startServer() {
         console.warn(`[API_404] No route matched for: ${url}`);
         return res.status(404).json({ error: "API route not found on this server" });
       }
-      res.sendFile(path.join(distPath, "index.html"));
+      const indexPath = path.join(distPath, "index.html");
+      if (!fs.existsSync(indexPath)) {
+        console.error(`[CRITICAL] SPA fallback failed: index.html not found at ${indexPath}`);
+        return res.status(500).send(`Configuration error: SPA index.html missing. Path: ${indexPath}`);
+      }
+      res.sendFile(indexPath);
     });
   }
 

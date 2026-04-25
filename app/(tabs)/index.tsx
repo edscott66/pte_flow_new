@@ -5,19 +5,22 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { scoreService, RecentActivity } from '@/services/scoreService';
 import { useTheme } from '@/context/ThemeContext';
+import * as Haptics from 'expo-haptics';
 
 // --- PRACTICE MODULES DATA ---
 const PRACTICE_MODULES = [
   {
     id: 'speaking',
     title: 'Speaking',
+    displayTitle: 'Speaking 8 Task Types',
     icon: 'mic-outline',
     color: '#2563EB',
-    tasks: ['Read Aloud', 'Repeat Sentence', 'Describe Image', 'Summarize Group Discussion'],
+    tasks: ['Read Aloud', 'Repeat Sentence', 'Describe Image', 'Summarize Group Discussion', 'Retell Lecture', 'Answer Short Question', 'Personal Intro', 'Situational Response'],
   },
   {
     id: 'writing',
     title: 'Writing',
+    displayTitle: 'Writing 2 Task Types',
     icon: 'create-outline',
     color: '#F97316',
     tasks: ['Summarize Written Text', 'Essay'],
@@ -25,23 +28,30 @@ const PRACTICE_MODULES = [
   {
     id: 'reading',
     title: 'Reading',
+    displayTitle: 'Reading 5 Task Types',
     icon: 'book-outline',
     color: '#10B981',
-    tasks: ['Fill in the Blanks', 'Re-order Paragraphs'],
+    tasks: ['Fill in the Blanks', 'Re-order Paragraphs', 'MC Single Answer', 'MC Multiple Answer', 'Reading FIB'],
   },
   {
     id: 'listening',
     title: 'Listening',
+    displayTitle: 'Listening 8 Task Types',
     icon: 'headset-outline',
     color: '#8B5CF6',
-    tasks: ['Summarize Spoken Text', 'Write From Dictation'],
+    tasks: ['Summarize Spoken Text', 'Write From Dictation', 'Highlight Incorrect Words', 'Select Missing Word', 'Highlight Correct Summary', 'MC Single', 'MC Multiple', 'Dictation'],
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const [userName, setUserName] = useState("PTE Student");
+  const [streak, setStreak] = useState(0);
+  const [totalStudyTime, setTotalStudyTime] = useState(0);
+  const [mistakeCount, setMistakeCount] = useState(0);
   const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null);
+  const [cfa, setCfa] = useState(0); // Correct First Attempts
+  const [ffa, setFfa] = useState(0); // Failed First Attempts
   const { colors, isDark } = useTheme();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -95,11 +105,26 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const loadActivity = async () => {
+      const loadData = async () => {
         const activity = await scoreService.getRecentActivity();
         setRecentActivity(activity);
+        
+        const currentStreak = await scoreService.getStreak();
+        setStreak(currentStreak);
+        
+        const studyTime = await scoreService.getTotalStudyTime();
+        setTotalStudyTime(studyTime);
+
+        const mistakes = await scoreService.getMistakes();
+        setMistakeCount(mistakes.length);
+
+        const correctFirsts = await scoreService.getCorrectFirstAttempts();
+        setCfa(correctFirsts);
+
+        const failedFirsts = await scoreService.getFailedFirstAttempts();
+        setFfa(failedFirsts);
       };
-      loadActivity();
+      loadData();
     }, [])
   );
 
@@ -128,7 +153,26 @@ export default function HomeScreen() {
     profileButton: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface },
     avatarImage: { width: '100%', height: '100%', borderRadius: 24 },
   
+    progressReportCard: {
+      backgroundColor: colors.surface,
+      padding: 20,
+      borderRadius: 20,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    prTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 16 },
+    prRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    prLabelContainer: { flexDirection: 'row', alignItems: 'center' },
+    prLabel: { fontSize: 14, color: colors.text, marginLeft: 8 },
+    prValue: { fontSize: 16, fontWeight: 'bold' },
+
     progressCard: { backgroundColor: colors.primary, padding: 20, borderRadius: 20, marginBottom: 24 },
+
     progressInfo: { marginBottom: 12 },
     progressTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
     progressSub: { color: isDark ? '#BFDBFE' : '#BFDBFE', fontSize: 14, marginBottom: 12, opacity: 0.8 },
@@ -141,8 +185,20 @@ export default function HomeScreen() {
       backgroundColor: '#10B981', 
       padding: 20, 
       borderRadius: 20, 
-      marginBottom: 24,
+      marginBottom: 12,
       shadowColor: '#10B981',
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    customMockCard: {
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      backgroundColor: '#8B5CF6', 
+      padding: 20, 
+      borderRadius: 20, 
+      marginBottom: 24,
+      shadowColor: '#8B5CF6',
       shadowOpacity: 0.3,
       shadowRadius: 10,
       elevation: 5,
@@ -151,6 +207,7 @@ export default function HomeScreen() {
     mockExamInfo: { flex: 1 },
     mockExamTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
     mockExamSub: { color: '#D1FAE5', fontSize: 12 },
+    customMockSub: { color: '#EDE9FE', fontSize: 12 },
   
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 16 },
     
@@ -184,6 +241,35 @@ export default function HomeScreen() {
     activityInfo: { flex: 1 },
     activityTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
     activityTime: { fontSize: 12, color: colors.subtext, marginTop: 2 },
+    
+    statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 12 },
+    statBox: { 
+      flex: 1, 
+      backgroundColor: colors.surface, 
+      padding: 16, 
+      borderRadius: 16, 
+      flexDirection: 'row', 
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border
+    },
+    statValue: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginLeft: 8 },
+    statLabel: { fontSize: 12, color: colors.subtext, marginLeft: 8 },
+
+    mistakesCard: {
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      backgroundColor: isDark ? '#450a0a' : '#fef2f2', 
+      padding: 20, 
+      borderRadius: 20, 
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: isDark ? '#991b1b' : '#fecaca',
+    },
+    mistakesIcon: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    mistakesInfo: { flex: 1 },
+    mistakesTitle: { color: isDark ? '#f87171' : '#b91c1c', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+    mistakesSub: { color: isDark ? '#fca5a5' : '#ef4444', fontSize: 12 },
   });
 
   return (
@@ -201,24 +287,59 @@ export default function HomeScreen() {
               </Animated.Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => router.push('/profile')}>
+          <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/profile'); }}>
             <Animated.View style={[dynamicStyles.profileButton, {
               transform: [{ scale: pulseAnim }],
-              borderColor: colors.primary,
-              borderWidth: borderOpacityAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 2]
-              }),
+              borderColor: '#c09c32',
+              borderWidth: 2,
+              overflow: 'hidden'
             }]}>
               <Image source={require('../../assets/images/BBLPTF.png')} style={dynamicStyles.avatarImage} />
             </Animated.View>
           </TouchableOpacity>
         </View>
 
+        {/* User Stats Row */}
+        <View style={dynamicStyles.statsRow}>
+          <View style={dynamicStyles.statBox}>
+            <MaterialCommunityIcons name="fire" size={24} color={streak > 0 ? "#F97316" : colors.subtext} />
+            <View>
+              <Text style={dynamicStyles.statValue}>{streak}</Text>
+              <Text style={dynamicStyles.statLabel}>Day Streak</Text>
+            </View>
+          </View>
+          <View style={dynamicStyles.statBox}>
+            <MaterialCommunityIcons name="clock-outline" size={24} color={colors.primary} />
+            <View>
+              <Text style={dynamicStyles.statValue}>{totalStudyTime}m</Text>
+              <Text style={dynamicStyles.statLabel}>Total Study</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Progress Report (Private First Attempts) */}
+        <View style={dynamicStyles.progressReportCard}>
+          <Text style={dynamicStyles.prTitle}>Progress report</Text>
+          <View style={dynamicStyles.prRow}>
+            <View style={dynamicStyles.prLabelContainer}>
+              <MaterialCommunityIcons name="check-circle-outline" size={20} color="#10B981" />
+              <Text style={dynamicStyles.prLabel}>Correct questions</Text>
+            </View>
+            <Text style={[dynamicStyles.prValue, { color: '#10B981' }]}>{cfa}</Text>
+          </View>
+          <View style={dynamicStyles.prRow}>
+            <View style={dynamicStyles.prLabelContainer}>
+              <MaterialCommunityIcons name="close-circle-outline" size={20} color="#EF4444" />
+              <Text style={dynamicStyles.prLabel}>Incorrect questions</Text>
+            </View>
+            <Text style={[dynamicStyles.prValue, { color: '#EF4444' }]}>{ffa}</Text>
+          </View>
+        </View>
+
         {/* Daily Progress Card */}
         <TouchableOpacity 
           style={dynamicStyles.progressCard}
-          onPress={() => router.push('/daily-goals')}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/daily-goals'); }}
         >
           <View style={dynamicStyles.progressInfo}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -235,7 +356,7 @@ export default function HomeScreen() {
         {/* Mock Exam Section */}
         <TouchableOpacity 
           style={dynamicStyles.mockExamCard} 
-          onPress={() => router.push('/module/mock-exam')}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/module/mock-exam'); }}
         >
           <View style={dynamicStyles.mockExamIcon}>
             <MaterialCommunityIcons name="file-document-edit-outline" size={32} color="#fff" />
@@ -247,6 +368,39 @@ export default function HomeScreen() {
           <Ionicons name="chevron-forward" size={24} color="#fff" />
         </TouchableOpacity>
 
+        {/* Custom Mock Exam Section */}
+        <TouchableOpacity 
+          style={dynamicStyles.customMockCard} 
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/custom-mock'); }}
+        >
+          <View style={dynamicStyles.mockExamIcon}>
+            <MaterialCommunityIcons name="cog-outline" size={32} color="#fff" />
+          </View>
+          <View style={dynamicStyles.mockExamInfo}>
+            <Text style={dynamicStyles.mockExamTitle}>Custom Mock Test</Text>
+            <Text style={dynamicStyles.customMockSub}>Select specific questions to practice</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Mistakes Bank Section */}
+        <TouchableOpacity 
+          style={dynamicStyles.mistakesCard} 
+          onPress={() => { 
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+            router.push('/module/mistakes'); 
+          }}
+        >
+          <View style={dynamicStyles.mistakesIcon}>
+            <MaterialCommunityIcons name="alert-decagram" size={32} color="#fff" />
+          </View>
+          <View style={dynamicStyles.mistakesInfo}>
+            <Text style={dynamicStyles.mistakesTitle}>Review Mistakes</Text>
+            <Text style={dynamicStyles.mistakesSub}>{mistakeCount} questions in your private bank</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={isDark ? '#f87171' : '#b91c1c'} />
+        </TouchableOpacity>
+
         {/* Practice Modules Grid */}
         <Text style={dynamicStyles.sectionTitle}>Practice Modules</Text>
         <View style={dynamicStyles.grid}>
@@ -254,13 +408,13 @@ export default function HomeScreen() {
             <TouchableOpacity 
               key={module.id} 
               style={dynamicStyles.moduleCard}
-              onPress={() => router.push(`/module/${module.id}`)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/module/${module.id}`); }}
             >
               <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? `${module.color}30` : `${module.color}15` }]}>
                 <Ionicons name={module.icon as any} size={28} color={isDark ? colors.primary : module.color} />
               </View>
-              <Text style={dynamicStyles.moduleTitle}>{module.title}</Text>
-              <Text style={dynamicStyles.moduleTasks}>{module.tasks.length} Task Types</Text>
+              <Text style={dynamicStyles.moduleTitle}>{module.displayTitle || module.title}</Text>
+              <Text style={dynamicStyles.moduleTasks}>{module.tasks.length} Exercises Available</Text>
             </TouchableOpacity>
           ))}
         </View>

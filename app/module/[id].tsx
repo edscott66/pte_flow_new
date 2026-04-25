@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateMockExam } from '@/utils/mockExamGenerator';
 import CustomLoader from '@/components/CustomLoader';
 import { useTheme } from '@/context/ThemeContext';
+import * as Haptics from 'expo-haptics';
 
 // Import All Data Files
 import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '@/constants/multipleChoiceReadingSingleData';
@@ -33,7 +34,7 @@ import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '@/constants/highlightCorrec
 import { ESSAY_QUESTIONS } from '@/constants/essayData';
 import { SUMMARIZE_GROUP_QUESTIONS } from '@/constants/summarizeGroupData'; 
 import { RESPOND_SITUATION_QUESTIONS } from '@/constants/respondSituationData';
-import { db, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
 import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '@/services/geminiService';
 import { scoreService } from '@/services/scoreService';
@@ -194,7 +195,7 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
 });
 
 export default function ModuleScreen() {
-  const { id, startIndex } = useLocalSearchParams();
+  const { id, startIndex, customConfig } = useLocalSearchParams();
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
@@ -365,66 +366,105 @@ export default function ModuleScreen() {
   };
 
   const awardPointIfFirstAttempt = async (isCorrect: boolean) => {
-    if (id === 'mock-exam') {
-      console.log("[Score] Mock exam attempt, skipping leaderboard update.");
-      return;
-    }
+    // 1. Maintain engagement streak regardless of correctness
+    await scoreService.updateStreak();
 
-    if (!isCorrect) {
-      console.log("[Score] Question incorrect, no point awarded.");
-      showFeedback("Incorrect. No points awarded.", "error");
-      return;
-    }
-    
     const q = questions[currentIndex];
+    if (!q) return;
+
+    // Generate a consistent ID for tracking progress and mistakes
     const questionId = q.id || `${id}_${currentIndex}_${(q.text || q.topic || q.displayText || '').substring(0, 10)}`;
-    
-    console.log(`[Score] Checking attempt for questionId: ${questionId}`);
-    const isFirst = await scoreService.isFirstAttempt(questionId);
-    if (isFirst) {
-      await scoreService.markAsAttempted(questionId);
-      const newScore = await scoreService.addPoint();
-      const attempted = await scoreService.getAttemptedQuestions();
-      console.log(`[Score] First correct attempt! New score: ${newScore}`);
-      showFeedback("+1 Point Awarded! Well done.", "success");
-      
-      const canEdit = await networkService.canEditTable();
-      if (canEdit) {
-        const name = await scoreService.getUserName();
-        let userId = await AsyncStorage.getItem('pte_flow_user_id');
-        if (!userId) {
-          userId = Math.random().toString(36).substring(7);
-          await AsyncStorage.setItem('pte_flow_user_id', userId);
-        }
-        
-        if (name) {
-          try {
-            await ensureAuth();
-            const userDocRef = doc(db, 'leaderboard', userId);
-            await setDoc(userDocRef, {
-              userId,
-              name,
-              score: newScore,
-              attemptedQuestions: attempted,
-              lastUpdate: new Date().toISOString()
-            }, { merge: true });
-            console.log("[Firebase] Score and attempted questions updated successfully in cloud");
-          } catch (e) {
-            console.error("Firebase sync failed", e);
-          }
+
+    // 2. Immediate Haptic & State Feedback (and mistake tracking)
+    if (isCorrect) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (questionId) {
+        await scoreService.removeMistake(questionId);
+        if (id === 'mistakes') {
+          showFeedback("Mastered! Removed from Mistake Bank.", "success");
         }
       }
     } else {
-      console.log("[Score] Question already attempted, no additional point awarded.");
-      showFeedback("Correct! (Already awarded point previously)", "info");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (id !== 'mistakes') {
+        await scoreService.saveMistake({
+          ...q,
+          id: questionId,
+          moduleType: id,
+          originalIndex: currentIndex
+        });
+      }
+    }
+
+    // 3. Boundary Control for Scoring & Leaderboard
+    if (id === 'mock-exam' || id === 'mistakes') {
+      console.log(`[Score] ${id === 'mock-exam' ? 'Mock exam' : 'Mistakes bank review'} attempt.`);
+      if (!isCorrect) showFeedback("Incorrect. Save to mistakes bank.", "error");
+      return;
+    }
+
+    // 4. Point Awarding Logic (First Attempt Only)
+    const isFirst = await scoreService.isFirstAttempt(questionId);
+    
+    if (isFirst) {
+      await scoreService.markAsAttempted(questionId);
+
+      if (isCorrect) {
+        // Progress Report: Correct First Attempt +1
+        const newCfa = await scoreService.addCorrectFirstAttempt();
+        console.log(`[Score] Progress Report updated: Correct Qs = ${newCfa}`);
+        showFeedback("+1 on Progress! Well done.", "success");
+
+        // Global Leaderboard logic: only award point if in a group (groupId != userId)
+        const groupId = await scoreService.getGroupId();
+        const firebaseUid = auth.currentUser?.uid;
+        
+        // Ensure we have both IDs and they are different (meaning user is in someone else's group or has invited others)
+        if (groupId && firebaseUid && groupId !== firebaseUid) {
+          const newScore = await scoreService.addPoint();
+          console.log(`[Score] Global Leaderboard Points: ${newScore}`);
+          
+          const canEdit = await networkService.canEditTable();
+          if (canEdit) {
+            const name = await scoreService.getUserName();
+            if (name) {
+              try {
+                await ensureAuth();
+                const userDocRef = doc(db, 'leaderboard', firebaseUid);
+                await setDoc(userDocRef, {
+                  score: newScore,
+                  lastUpdate: new Date().toISOString()
+                }, { merge: true });
+                console.log("[Score] Global sync successful.");
+              } catch (e) {
+                console.error("Firebase sync failed:", e);
+              }
+            }
+          }
+        } else {
+          console.log(`[Score] Not in group (Group: ${groupId}, User: ${firebaseUid}). Global score unchanged.`);
+        }
+      } else {
+        // Incorrect on first attempt
+        const newFfa = await scoreService.addFailedFirstAttempt();
+        console.log(`[Score] Progress Report updated: Incorrect Qs = ${newFfa}`);
+        showFeedback("Incorrect on first try. Recorded in Progress.", "error");
+      }
+    } else {
+      console.log("[Score] Re-attempt: No Progress Report impact.");
+      if (isCorrect) {
+        showFeedback("Correct!", "success");
+      } else {
+        showFeedback("Incorrect. Keep practicing!", "error");
+      }
     }
   };
 
   const moduleInfo = MODULES.find(m => m.id === id);
 
-  // 2. ACTIVE TYPE DEFINITION (Fixes activeType error)
+  // 2. ACTIVE TYPE DEFINITION (Fixes activeType error - ensures mistakes bank and mock exam items render correctly)
   const currentItem = questions[currentIndex] || {};
-  const activeType = (id === 'mock-exam' && currentItem.type) ? currentItem.type : id;
+  const activeType = currentItem.type || currentItem.moduleType || id;
   
   // --- IDENTIFY MODULES (Must use activeType, NOT id) ---
   const isReadAloud = activeType === 'read-aloud';
@@ -459,13 +499,27 @@ export default function ModuleScreen() {
 
     if (id === 'mock-exam') {
         try {
-            const sections = generateMockExam(); 
+            const configStr = typeof customConfig === 'string' ? customConfig : undefined;
+            const sections = generateMockExam(configStr); 
             setMockExamSections(sections);
             setMockExamFlow('MAIN_INTRO');
             setQuestions([]); 
         } catch (e) {
             console.log("Mock Exam Error:", e);
         }
+    } else if (id === 'mistakes') {
+        const loadMistakes = async () => {
+          const mistakes = await scoreService.getMistakes();
+          if (mistakes.length === 0) {
+            Alert.alert("Empty Bank", "You don't have any mistakes to review yet. Good job!");
+            router.back();
+            return;
+          }
+          setQuestions(mistakes);
+          setLoading(false);
+        };
+        loadMistakes();
+        return; // Skip standard loading
     } else {
         // Standard Module Loading
         if (id === 'read-aloud') loaded = READ_ALOUD_QUESTIONS;
@@ -539,6 +593,8 @@ export default function ModuleScreen() {
   const [showSpeakNow, setShowSpeakNow] = useState(false);
   const [showIntroPopup, setShowIntroPopup] = useState(true);
   const [resetKey, setResetKey] = useState(0);
+  const [hideInstruction, setHideInstruction] = useState(false);
+  const startTimeRef = useRef<number>(Date.now());
 
   const TASK_INSTRUCTIONS: Record<string, string> = {
     'read-aloud': 'Speak the text smoothly at a natural pace with clear pronunciation, correct stress, and steady rhythm while matching the punctuation and meaning of the passage.',
@@ -697,6 +753,15 @@ export default function ModuleScreen() {
       if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
       keyboardShow.remove();
       keyboardHide.remove();
+
+      // Record study time on exit
+      const endTime = Date.now();
+      const elapsedMs = endTime - startTimeRef.current;
+      const elapsedMins = Math.floor(elapsedMs / (1000 * 60));
+      if (elapsedMins > 0) {
+        // Cap at 2 hours for a single session to prevent bugs
+        scoreService.addStudyTime(Math.min(elapsedMins, 120));
+      }
     };
   }, []);
 
@@ -713,6 +778,7 @@ export default function ModuleScreen() {
     if (questions.length > 0 && currentItem) {
       // 1. RESET ALL GLOBAL STATES FIRST (Safer for Mock Exam)
       setMode('IDLE'); setResult(null); setTimeLeft(0); setUserSummary(""); setWordCount(0);
+      setHideInstruction(false);
       setSelectedOptions([]); setSelectedIndices([]); setRwAnswers([]); setLFibAnswers([]);
       setBlankAnswers([]); setUserOrder([]); setJumbledList([]); 
       setReOrderScore(null); setFillBlankScore(null);
@@ -907,6 +973,10 @@ export default function ModuleScreen() {
   }
 
   const scrollToQuestion = (index: number) => {
+    if (id === 'mock-exam' && index < currentIndex) {
+      // Generally don't allow going back in mock exam as it's one-way
+      return; 
+    }
     setCurrentIndex(index);
     setMode('IDLE');
     setResult(null);
@@ -1196,19 +1266,19 @@ export default function ModuleScreen() {
 
           if (res.userTranscript) setUserSummary(res.userTranscript);
           
-          let pts = res.overall >= 50 ? 1 : 0;
+          let pts = res.overall / 90;
           
           if (isASQ) {
-              pts = res.content >= 50 ? 1 : 0; 
+              pts = res.content / 90; 
               setResult(res);
               setAsqResultPopup(true);
               setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
-              awardPointIfFirstAttempt(pts === 1);
+              awardPointIfFirstAttempt(pts >= 0.8);
               return; 
           }
 
           setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
-          awardPointIfFirstAttempt(pts === 1);
+          awardPointIfFirstAttempt(pts >= 0.8);
           setResult(res);
           setMode('RESULT');
         } catch (e) { 
@@ -1351,9 +1421,9 @@ export default function ModuleScreen() {
       }
 
       setResult(res);
-      const isCorrect = res.overall >= 50;
-      setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
-      awardPointIfFirstAttempt(isCorrect);
+      const pts = res.overall / 90;
+      setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
+      awardPointIfFirstAttempt(pts >= 0.8);
       setMode('RESULT');
     } catch (error) { Alert.alert("Error", "AI Scoring failed."); setMode('IDLE'); }
   };
@@ -1378,9 +1448,9 @@ export default function ModuleScreen() {
       }
 
       setResult(res);
-      const isCorrect = res.overall >= 50;
-      setScoredQuestions(prev => ({...prev, [currentIndex]: isCorrect ? 1 : 0}));
-      awardPointIfFirstAttempt(isCorrect);
+      const pts = res.overall / 90;
+      setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
+      awardPointIfFirstAttempt(pts >= 0.8);
       setMode('RESULT');
     } catch (error) {
       Alert.alert("Error", "AI Scoring failed.");
@@ -1581,7 +1651,7 @@ export default function ModuleScreen() {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");
       return;
     }
-    const correct = questions[currentIndex].correctAnswers; let score = 0; rwAnswers.forEach((ans, index) => { if (ans.trim().toLowerCase() === correct[index].toLowerCase()) score++; }); const points = score / correct.length; setScoredQuestions(prev => ({...prev, [currentIndex]: points})); setRwResult({ score, max: correct.length }); setMode('RESULT'); 
+    const correct = questions[currentIndex].correctAnswers; let score = 0; rwAnswers.forEach((ans, index) => { if (ans.trim().toLowerCase() === correct[index].toLowerCase()) score++; }); const points = score / correct.length; setScoredQuestions(prev => ({...prev, [currentIndex]: points})); awardPointIfFirstAttempt(score === correct.length); setRwResult({ score, max: correct.length }); setMode('RESULT'); 
   };
   const handleLFibChange = (text: string, index: number) => { const newAnswers = [...lFibAnswers]; newAnswers[index] = text; setLFibAnswers(newAnswers); };
   const checkLFibAnswer = () => { 
@@ -1589,7 +1659,7 @@ export default function ModuleScreen() {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");
       return;
     }
-    const correct = questions[currentIndex].correctAnswers; let score = 0; lFibAnswers.forEach((ans, index) => { if (ans.trim().toLowerCase() === correct[index].toLowerCase()) score++; }); const points = score / correct.length; setScoredQuestions(prev => ({...prev, [currentIndex]: points})); setLFibResult({ score, max: correct.length }); setShowLFibPopup(true); setMode('RESULT'); 
+    const correct = questions[currentIndex].correctAnswers; let score = 0; lFibAnswers.forEach((ans, index) => { if (ans.trim().toLowerCase() === correct[index].toLowerCase()) score++; }); const points = score / correct.length; setScoredQuestions(prev => ({...prev, [currentIndex]: points})); awardPointIfFirstAttempt(score === correct.length); setLFibResult({ score, max: correct.length }); setShowLFibPopup(true); setMode('RESULT'); 
   };
   const handleSelectRwWord = (word: string) => {
     if (activeRwBlankIndex !== null && !rwResult) {
@@ -1619,7 +1689,7 @@ export default function ModuleScreen() {
         {/* --- UPDATED QUESTION INDEX --- */}
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10}}>
           <Text style={[styles.questionIndex, {marginBottom: 0}]}>
-              {id === 'mock-exam' ? `Task ${index + 1} of ${questions.length}` : `Question ${index + 1} of ${questions.length}`}
+              {id === 'mock-exam' ? `Task ${index + 1} of ${questions.length}` : (id === 'mistakes' ? `Review ${index + 1} of ${questions.length}` : `Question ${index + 1} of ${questions.length}`)}
           </Text>
           {mode === 'RESULT' && (
             <Text style={{color: '#059669', fontWeight: 'bold', fontSize: 14}}>
@@ -1638,21 +1708,27 @@ export default function ModuleScreen() {
           )}
         </View>
 
-        {/* TASK INSTRUCTIONS (Mock Exam - First of each set) */}
-        {id === 'mock-exam' && questions.findIndex(q => q.type === item.type) === index && mode !== 'RESULT' && (
-          <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
+        {/* TASK INSTRUCTIONS (Mock Exam & Mistakes Bank - First of each set) */}
+        {(id === 'mock-exam' || id === 'mistakes') && questions.findIndex(q => (q.type || q.moduleType) === (item.type || item.moduleType)) === index && mode === 'IDLE' && !hideInstruction && (
+          <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#2563EB', position: 'relative' }}>
+            <TouchableOpacity 
+              onPress={() => setHideInstruction(true)} 
+              style={{ position: 'absolute', right: 8, top: 8, zIndex: 1 }}
+            >
+              <MaterialCommunityIcons name="close" size={20} color="#94A3B8" />
+            </TouchableOpacity>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <MaterialCommunityIcons name="information" size={18} color="#2563EB" />
               <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1E293B', marginLeft: 6 }}>INSTRUCTIONS:</Text>
             </View>
-            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 20 }}>
-              {TASK_INSTRUCTIONS[item.type] || 'Follow the instructions on screen to complete the task.'}
+            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 20, paddingRight: 20 }}>
+              {TASK_INSTRUCTIONS[item.type || item.moduleType] || 'Follow the instructions on screen to complete the task.'}
             </Text>
           </View>
         )}
         
         {/* 0. PERSONAL INTRO (Updated with Big Timer) */}
-        {((item.type === 'personal-intro' || id === 'personal-intro') && mode !== 'RESULT') && (
+        {(isPersonalIntro && mode !== 'RESULT') && (
              <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20}}>
                <MaterialCommunityIcons 
                   name={mode === 'RECORDING' ? "record-rec" : "account-voice"} 
@@ -2286,9 +2362,32 @@ export default function ModuleScreen() {
   );
 
   const renderFinalResults = () => {
-    const totalQuestions = MOCK_EXAM_SECTIONS_INFO.reduce((sum, s) => sum + s.questionCount, 0);
+    const totalQuestions = mockExamSections.reduce((sum, s) => sum + s.questions.length, 0);
     const totalCorrect = Object.values(sectionScores).reduce((sum, scores) => sum + scores.reduce((a, b) => a + b, 0), 0);
-    const overallScore = Math.round((totalCorrect / totalQuestions) * 90);
+    const percentOverall = totalQuestions > 0 ? (totalCorrect / totalQuestions) : 0;
+    const overallScore = Math.round(percentOverall * 90);
+
+    const sectionPerformances = mockExamSections.map(section => {
+      const scores = sectionScores[section.id] || [];
+      const correct = scores.reduce((sum, scores) => sum + scores, 0);
+      const qCount = section.questions.length;
+      const percent = qCount > 0 ? Math.round((correct / qCount) * 100) : 0;
+      
+      // Dynamic naming to be more specific (e.g. "Speaking" instead of "Speaking & Writing" if only one is present)
+      let dynamicName = section.title;
+      if (section.id === 'speaking-writing') {
+        const hasSpeaking = section.questions.some((q: any) => ['read-aloud', 'repeat-sentence', 'describe-image', 'retell-lecture', 'answer-short-question', 'summarize-group-discussion', 'respond-to-situation'].includes(q.type));
+        const hasWriting = section.questions.some((q: any) => ['summarize-written', 'essay'].includes(q.type));
+        if (hasSpeaking && !hasWriting) dynamicName = 'Speaking';
+        else if (hasWriting && !hasSpeaking) dynamicName = 'Writing';
+      }
+
+      return { id: section.id, name: dynamicName, correct, qCount, percent };
+    });
+
+    const sortedByScore = [...sectionPerformances].filter(s => s.qCount > 0).sort((a,b) => b.percent - a.percent);
+    const bestSection = sortedByScore.length > 0 ? sortedByScore[0].name : 'your tested';
+    const worstSection = sortedByScore.length > 0 ? sortedByScore[sortedByScore.length - 1].name : 'your tested';
 
     return (
       <SafeAreaView style={styles.container}>
@@ -2299,54 +2398,61 @@ export default function ModuleScreen() {
         </View>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <View style={{ alignItems: 'center', marginBottom: 30, backgroundColor: '#fff', padding: 30, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 }}>
-            <Text style={{ fontSize: 18, color: '#64748B', fontWeight: 'bold' }}>OVERALL PTE SCORE</Text>
-            <Text style={{ fontSize: 72, fontWeight: 'bold', color: '#2563EB' }}>{overallScore}</Text>
+            <Text style={{ fontSize: 18, color: '#64748B', fontWeight: 'bold' }}>ESTIMATED SCORE</Text>
+            <Text style={{ fontSize: 72, fontWeight: 'bold', color: overallScore >= 79 ? '#059669' : overallScore >= 65 ? '#2563EB' : overallScore >= 50 ? '#D97706' : '#DC2626' }}>{overallScore}</Text>
             <Text style={{ fontSize: 18, color: '#64748B' }}>out of 90</Text>
           </View>
 
           <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 15 }}>Section Breakdown</Text>
-          {MOCK_EXAM_SECTIONS_INFO.map((section) => {
-            const scores = sectionScores[section.id] || [];
-            const correct = scores.reduce((a, b) => a + b, 0);
-            const percent = Math.round((correct / section.questionCount) * 100);
-            return (
-              <View key={section.id} style={{ backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>{section.title.split(': ')[1]}</Text>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2563EB' }}>{percent}%</Text>
-                </View>
-                <View style={{ height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
-                  <View style={{ height: '100%', width: `${percent}%`, backgroundColor: '#2563EB' }} />
-                </View>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>{correct.toFixed(1)} / {section.questionCount} Correct</Text>
+          {sectionPerformances.map((section) => (
+            <View key={section.id} style={{ backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>{section.name}</Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: section.percent >= 70 ? '#059669' : section.percent >= 50 ? '#2563EB' : '#DC2626' }}>{section.percent}%</Text>
               </View>
-            );
-          })}
+              <View style={{ height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                <View style={{ height: '100%', width: `${section.percent}%`, backgroundColor: section.percent >= 70 ? '#059669' : section.percent >= 50 ? '#2563EB' : '#DC2626' }} />
+              </View>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>{section.correct.toFixed(2)} / {section.qCount} pts earned</Text>
+            </View>
+          ))}
 
           <View style={{ marginTop: 20, backgroundColor: '#F0F9FF', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>AI Feedback & Analysis</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Feedback & Analysis</Text>
             <Text style={{ fontSize: 14, color: '#475569', lineHeight: 22 }}>
-              Your overall performance indicates a {overallScore > 79 ? 'superior' : overallScore > 64 ? 'proficient' : overallScore > 49 ? 'competent' : 'developing'} command of academic English.
+              Your performance on these {totalQuestions} questions indicates a {overallScore >= 79 ? 'Superior (C1+)' : overallScore >= 65 ? 'Proficient (B2)' : overallScore >= 50 ? 'Limited (B1)' : 'Developing (A2)'} command of the tested material according to PTE standards.
               {"\n\n"}
-              <Text style={{fontWeight: 'bold'}}>Strengths:</Text> You performed best in the {
-                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
-                .sort((a,b) => b.score - a.score)[0].name
-              } section. Continue practicing these tasks to maintain your high standard.
-              {"\n\n"}
-              <Text style={{fontWeight: 'bold'}}>Areas for Improvement:</Text> Your scores in {
-                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
-                .sort((a,b) => a.score - b.score)[0].name
-              } suggest you should focus more on these question types. Specifically, ensure you are familiar with the timing and scoring criteria for these tasks.
-              {"\n\n"}
-              <Text style={{fontWeight: 'bold'}}>Next Steps:</Text> We recommend spending 30-60 minutes daily on {
-                MOCK_EXAM_SECTIONS_INFO.map(s => ({ id: s.id, name: s.title.split(': ')[1], score: (sectionScores[s.id]?.reduce((a,b)=>a+b,0) || 0) / s.questionCount }))
-                .sort((a,b) => a.score - b.score)[0].name
-              } practice modules. Focus on accuracy first, then work on your speed.
+              {sortedByScore.length === 1 ? (
+                <>
+                  <Text style={{fontWeight: 'bold'}}>Single-Section Analysis:</Text> In your {sortedByScore[0].name} practice, you achieved {sortedByScore[0].percent}% accuracy. 
+                  {sortedByScore[0].percent >= 75 ? " This is a strong result. Keep up the high standard!" : 
+                   sortedByScore[0].percent >= 50 ? " This is a solid foundation, but targeted practice can help you reach the next band." : 
+                   " This area needs significant focus to improve your readiness for the actual exam."}
+                  {"\n\n"}
+                  <Text style={{fontWeight: 'bold'}}>Action Plan:</Text> {sortedByScore[0].percent < 70 ? `Review the questions you missed in ${sortedByScore[0].name} and try the individual task modules for more practice.` : `Try a full Mock Exam with all sections to see how you perform under complete test conditions.`}
+                </>
+              ) : sortedByScore.length > 1 ? (
+                <>
+                  {sortedByScore[0].percent >= 60 && (
+                    <>
+                      <Text style={{fontWeight: 'bold'}}>Strengths:</Text> You demonstrated the highest accuracy in the {bestSection} section. This suggests your foundational skills in these task types are solid.
+                      {"\n\n"}
+                    </>
+                  )}
+                  {sortedByScore[sortedByScore.length - 1].percent < sortedByScore[0].percent - 5 && (
+                    <>
+                      <Text style={{fontWeight: 'bold'}}>Critical Improvement Areas:</Text> Your scores in the {worstSection} section were lower than your average, dragging down your overall estimate. Focus on these specific tasks to raise your overall score.
+                      {"\n\n"}
+                    </>
+                  )}
+                  <Text style={{fontWeight: 'bold'}}>Action Plan:</Text> We recommend targeted practice on {worstSection} modules. Aim for a {Math.min(90, Math.round(percentOverall * 100 + 10))}% accuracy target before your next attempt.
+                </>
+              ) : null}
             </Text>
           </View>
         </ScrollView>
         <View style={{ padding: 20 }}>
-          <TouchableOpacity style={styles.btnPrimary} onPress={() => router.replace('/(tabs)')}>
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.replace('/(tabs)'); }}>
             <Text style={styles.btnText}>Back to Dashboard</Text>
           </TouchableOpacity>
         </View>
@@ -2354,7 +2460,7 @@ export default function ModuleScreen() {
     );
   };
 
-  if (!moduleInfo && !CATEGORIES[id as string]) return <View><Text>Module not found</Text></View>;
+  if (!moduleInfo && !CATEGORIES[id as string] && id !== 'mistakes') return <View><Text>Module not found</Text></View>;
 
   if (id === 'mock-exam') {
     if (mockExamFlow === 'MAIN_INTRO') return renderMainIntro();
@@ -2428,7 +2534,7 @@ export default function ModuleScreen() {
                 </View>
             )}
             <Text style={styles.headerTitle} numberOfLines={1}>
-                {id === 'mock-exam' ? 'Mock Exam' : (isFillBlanksListening ? '' : moduleInfo?.title)}
+                {id === 'mock-exam' ? 'Mock Exam' : (id === 'mistakes' ? 'Mistakes Bank' : (isFillBlanksListening ? '' : moduleInfo?.title))}
             </Text>
         </View>
 
@@ -2451,13 +2557,34 @@ export default function ModuleScreen() {
 
       {!isKeyboardVisible && (
         <View style={styles.jumpToContainer}>
-          <Text style={styles.jumpToLabel}>JUMP TO:</Text>
+          <Text style={styles.jumpToLabel}>SECTION PROGRESS:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.jumpToScroll}>
-            {questions.map((_, index) => (
-              <TouchableOpacity key={index} style={[styles.jumpCircle, currentIndex === index && styles.jumpCircleActive]} onPress={() => scrollToQuestion(index)}>
-                <Text style={[styles.jumpCircleText, currentIndex === index && styles.jumpCircleTextActive]}>{index + 1}</Text>
-              </TouchableOpacity>
-            ))}
+            {questions.map((_, index) => {
+              const itemScored = scoredQuestions[index] !== undefined;
+              const isCurrent = currentIndex === index;
+              const canJump = id !== 'mock-exam'; // One chance in Mock Exam
+              
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[
+                    styles.jumpCircle, 
+                    isCurrent && styles.jumpCircleActive,
+                    id === 'mock-exam' && itemScored && { borderColor: '#10B981', backgroundColor: '#D1FAE5' }
+                  ]} 
+                  onPress={() => canJump ? scrollToQuestion(index) : null}
+                  disabled={!canJump}
+                >
+                  <Text style={[
+                      styles.jumpCircleText, 
+                      isCurrent && styles.jumpCircleTextActive,
+                      id === 'mock-exam' && itemScored && { color: '#059669' }
+                  ]}>
+                    {itemScored ? '✓' : index + 1}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -2579,13 +2706,13 @@ export default function ModuleScreen() {
                       )}
                   </ScrollView>
                   <View style={{ width: '100%', padding: 8, borderTopWidth: 1, borderColor: result.overall < 50 ? '#FECACA' : '#D1FAE5', backgroundColor: result.overall < 50 ? '#FEF2F2' : '#ECFDF5', gap: 6 }}>
-                      {result.overall < 50 && (
+                      {result.overall < 50 && id !== 'mock-exam' && (
                         <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                            <Text style={styles.btnTextSmall}>Try Again</Text>
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                         <Text style={styles.btnTextSmall}>{result.overall < 50 ? 'Skip to Next' : 'Next Question'}</Text>
+                         <Text style={styles.btnTextSmall}>{(result.overall < 50 && id !== 'mock-exam') ? 'Skip to Next' : 'Next Question'}</Text>
                          <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" style={{ position: 'absolute', right: 12 }} />
                       </TouchableOpacity>
                   </View>
@@ -2643,13 +2770,13 @@ export default function ModuleScreen() {
                   </ScrollView>
 
                   <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: mcResult.score < mcResult.max ? '#FEF2F2' : '#ECFDF5', borderTopWidth: 1, borderColor: mcResult.score < mcResult.max ? '#FECACA' : '#D1FAE5', borderRadius: 16 }}>
-                    {mcResult.score < mcResult.max && (
+                    {mcResult.score < mcResult.max && id !== 'mock-exam' && (
                       <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                          <Text style={styles.btnTextSmall}>Try Again</Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                       <Text style={styles.btnTextSmall}>{mcResult.score < mcResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                       <Text style={styles.btnTextSmall}>{(mcResult.score < mcResult.max && id !== 'mock-exam') ? 'Skip to Next' : 'Next Question'}</Text>
                        <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
                     </TouchableOpacity>
                   </View>
@@ -2675,13 +2802,13 @@ export default function ModuleScreen() {
                     )}
 
                     <View style={{ gap: 8, width: '100%', padding: 12, backgroundColor: dictationResult.score < dictationResult.max ? '#FEF2F2' : '#ECFDF5', borderTopWidth: 1, borderColor: dictationResult.score < dictationResult.max ? '#FECACA' : '#D1FAE5', borderRadius: 16 }}>
-                        {dictationResult.score < dictationResult.max && (
+                        {dictationResult.score < dictationResult.max && id !== 'mock-exam' && (
                             <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                                 <Text style={styles.btnTextSmall}>Try Again</Text>
                             </TouchableOpacity>
                         )}
                         <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                            <Text style={styles.btnTextSmall}>{dictationResult.score < dictationResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                            <Text style={styles.btnTextSmall}>{(dictationResult.score < dictationResult.max && id !== 'mock-exam') ? 'Skip to Next' : 'Next Question'}</Text>
                             <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
                         </TouchableOpacity>
                     </View>
@@ -2703,13 +2830,13 @@ export default function ModuleScreen() {
                     <Text style={[styles.resultSub, { color: '#991B1B' }]}>Please try again</Text>
                   )}
                   <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: highlightResult.score < highlightResult.max ? '#FEF2F2' : '#ECFDF5', borderTopWidth: 1, borderColor: highlightResult.score < highlightResult.max ? '#FECACA' : '#D1FAE5', borderRadius: 16 }}>
-                    {highlightResult.score < highlightResult.max && (
+                    {highlightResult.score < highlightResult.max && id !== 'mock-exam' && (
                         <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                            <Text style={styles.btnTextSmall}>Try Again</Text>
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                        <Text style={styles.btnTextSmall}>{highlightResult.score < highlightResult.max ? 'Skip to Next' : 'Next Question'}</Text>
+                        <Text style={styles.btnTextSmall}>{(highlightResult.score < highlightResult.max && id !== 'mock-exam') ? 'Skip to Next' : 'Next Question'}</Text>
                         <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
                     </TouchableOpacity>
                   </View>
@@ -2859,13 +2986,13 @@ export default function ModuleScreen() {
                   </ScrollView>
                   
                    <View style={{ marginTop: 15, gap: 8, width: '100%', padding: 12, backgroundColor: isAnyIncorrect ? '#FEF2F2' : '#ECFDF5', borderTopWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5', borderRadius: 16 }}>
-                    {isAnyIncorrect && (
+                    {isAnyIncorrect && id !== 'mock-exam' && (
                         <TouchableOpacity style={styles.btnPrimarySmall} onPress={handleResetQuestion}>
                            <Text style={styles.btnTextSmall}>Try Again</Text>
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity style={styles.nextBtnSmall} onPress={handleNext}>
-                        <Text style={styles.btnTextSmall}>{isAnyIncorrect ? 'Skip to Next' : 'Next Question'}</Text>
+                        <Text style={styles.btnTextSmall}>{(isAnyIncorrect && id !== 'mock-exam') ? 'Skip to Next' : 'Next Question'}</Text>
                         <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" style={{ position: 'absolute', right: 15 }} />
                     </TouchableOpacity>
                   </View>
@@ -3017,12 +3144,14 @@ export default function ModuleScreen() {
               </TouchableOpacity>
             ) : (
             <View style={{ gap: 8, width: '100%', padding: 12, backgroundColor: result?.content && result.content >= 60 ? '#F0FDF4' : '#FEF2F2', borderTopWidth: 1, borderColor: result?.content && result.content >= 60 ? '#D1FAE5' : '#FECACA', borderRadius: 16 }}>
-                <TouchableOpacity 
-                  style={styles.btnPrimarySmall} 
-                  onPress={handleResetQuestion}
-                >
-                  <Text style={styles.btnTextSmall}>Try Again</Text>
-                </TouchableOpacity>
+                {id !== 'mock-exam' && (
+                  <TouchableOpacity 
+                    style={styles.btnPrimarySmall} 
+                    onPress={handleResetQuestion}
+                  >
+                    <Text style={styles.btnTextSmall}>Try Again</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity 
                   style={styles.nextBtnSmall} 
                   onPress={proceedToNextASQ}

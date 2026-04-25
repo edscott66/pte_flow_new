@@ -46,6 +46,8 @@ export default function DailyGoalsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [timeAvailable, setTimeAvailable] = useState(15);
   const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+  const [streak, setStreak] = useState(0);
+  const [totalStudyTime, setTotalStudyTime] = useState(0);
   const [apiUrl, setApiUrl] = useState<string>('');
   const [showApiSettings, setShowApiSettings] = useState(false);
   const [dataSource, setDataSource] = useState<'api' | 'local'>('local');
@@ -480,6 +482,36 @@ export default function DailyGoalsScreen() {
       fontStyle: 'italic',
       textAlign: 'center',
     },
+    statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 24,
+    },
+    statBox: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statInfo: {
+      marginLeft: 10,
+    },
+    dailyStatValue: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    dailyStatLabel: {
+      fontSize: 10,
+      color: colors.subtext,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+    },
   }), [colors, isDark]);
 
   useEffect(() => {
@@ -487,6 +519,12 @@ export default function DailyGoalsScreen() {
       // Load user performance first
       const perf = await scoreService.getPerformance();
       setUserPerformance(perf);
+
+      const currentStreak = await scoreService.getStreak();
+      setStreak(currentStreak);
+      
+      const studyTime = await scoreService.getTotalStudyTime();
+      setTotalStudyTime(studyTime);
 
       let currentUrl = '';
       let savedUrl = await AsyncStorage.getItem('pte_flow_api_url');
@@ -675,6 +713,24 @@ export default function DailyGoalsScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>Daily Goals</Text>
           <View style={styles.placeholder} />
+        </View>
+
+        {/* STATS SECTION */}
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <MaterialCommunityIcons name="fire" size={24} color={streak > 0 ? "#F97316" : colors.subtext} />
+            <View style={styles.statInfo}>
+              <Text style={styles.dailyStatValue}>{streak}</Text>
+              <Text style={styles.dailyStatLabel}>Day Streak</Text>
+            </View>
+          </View>
+          <View style={styles.statBox}>
+            <MaterialCommunityIcons name="clock-outline" size={24} color="#2563EB" />
+            <View style={styles.statInfo}>
+              <Text style={styles.dailyStatValue}>{totalStudyTime}m</Text>
+              <Text style={styles.dailyStatLabel}>Total Study</Text>
+            </View>
+          </View>
         </View>
 
         {/* PREFERENCES SECTION */}

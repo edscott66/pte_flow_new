@@ -28,50 +28,73 @@ const getRandom = (arr: any[], count: number) => {
   return shuffled.slice(0, count);
 };
 
-export const generateMockExam = () => {
+export const generateMockExam = (customConfigStr?: string) => {
+  let configMap: Record<string, number> | null = null;
+  if (customConfigStr) {
+    try {
+      const parsed = JSON.parse(customConfigStr);
+      configMap = {};
+      parsed.forEach((item: any) => {
+        configMap![item.id] = item.count;
+      });
+    } catch (e) {
+      console.error('Failed to parse custom config', e);
+    }
+  }
+
+  // Helper to resolve count based on custom config or default
+  const getCount = (customId: string, defaultCount: number) => {
+    if (configMap) {
+      return customId in configMap ? configMap[customId] : 0;
+    }
+    return defaultCount;
+  };
+
   const sections = [
     {
       id: 'speaking-writing',
       title: 'Speaking & Writing',
       questions: [
-        ...getRandom([{ id: 'pi1', type: 'personal-intro', prompt: 'Please introduce yourself. This is not scored but will be sent to institutions.' }], 1),
-        ...getRandom(READ_ALOUD_QUESTIONS.map(q => ({ ...q, type: 'read-aloud' })), 7),
-        ...getRandom(REPEAT_SENTENCE_QUESTIONS.map(q => ({ ...q, type: 'repeat-sentence' })), 12),
-        ...getRandom(DESCRIBE_IMAGE_QUESTIONS.map(q => ({ ...q, type: 'describe-image' })), 6),
-        ...getRandom(RETELL_LECTURE_QUESTIONS.map(q => ({ ...q, type: 'retell-lecture' })), 3),
-        ...getRandom(ANSWER_SHORT_QUESTION_DATA.map(q => ({ ...q, type: 'answer-short-question' })), 12),
-        ...getRandom(SUMMARIZE_GROUP_QUESTIONS.map(q => ({ ...q, type: 'summarize-group-discussion' })), 1),
-        ...getRandom(RESPOND_SITUATION_QUESTIONS.map(q => ({ ...q, type: 'respond-to-situation' })), 1),
-        ...getRandom(SUMMARIZE_WRITTEN_QUESTIONS.map(q => ({ ...q, type: 'summarize-written' })), 3),
-        ...getRandom(ESSAY_QUESTIONS.map(q => ({ ...q, type: 'essay' })), 1),
+        // Only include personal intro if it's the full exam
+        ...(configMap ? [] : getRandom([{ id: 'pi1', type: 'personal-intro', prompt: 'Please introduce yourself. This is not scored but will be sent to institutions.' }], 1)),
+        ...getRandom(READ_ALOUD_QUESTIONS.map(q => ({ ...q, type: 'read-aloud' })), getCount('readAloud', 7)),
+        ...getRandom(REPEAT_SENTENCE_QUESTIONS.map(q => ({ ...q, type: 'repeat-sentence' })), getCount('repeatSentence', 12)),
+        ...getRandom(DESCRIBE_IMAGE_QUESTIONS.map(q => ({ ...q, type: 'describe-image' })), getCount('describeImage', 6)),
+        ...getRandom(RETELL_LECTURE_QUESTIONS.map(q => ({ ...q, type: 'retell-lecture' })), getCount('retellLecture', 3)),
+        ...getRandom(ANSWER_SHORT_QUESTION_DATA.map(q => ({ ...q, type: 'answer-short-question' })), getCount('answerShort', 12)),
+        ...getRandom(SUMMARIZE_GROUP_QUESTIONS.map(q => ({ ...q, type: 'summarize-group-discussion' })), getCount('summarizeGroup', 1)),
+        ...getRandom(RESPOND_SITUATION_QUESTIONS.map(q => ({ ...q, type: 'respond-to-situation' })), getCount('respondSituation', 1)),
+        ...getRandom(SUMMARIZE_WRITTEN_QUESTIONS.map(q => ({ ...q, type: 'summarize-written' })), getCount('summarizeWritten', 3)),
+        ...getRandom(ESSAY_QUESTIONS.map(q => ({ ...q, type: 'essay' })), getCount('essay', 1)),
       ]
     },
     {
       id: 'reading',
       title: 'Reading',
       questions: [
-        ...getRandom(FILL_BLANKS_RW_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks-rw' })), 25),
-        ...getRandom(MULTIPLE_CHOICE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice' })), 3),
-        ...getRandom(REORDER_PARAGRAPHS_QUESTIONS.map(q => ({ ...q, type: 're-order-paragraphs' })), 4),
-        ...getRandom(FILL_BLANKS_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks' })), 24),
-        ...getRandom(MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-r-single' })), 3),
+        ...getRandom(FILL_BLANKS_RW_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks-rw' })), getCount('fillBlanksRW', 25)),
+        ...getRandom(MULTIPLE_CHOICE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice' })), getCount('multipleChoice', 3)),
+        ...getRandom(REORDER_PARAGRAPHS_QUESTIONS.map(q => ({ ...q, type: 're-order-paragraphs' })), getCount('reorderParagraphs', 4)),
+        ...getRandom(FILL_BLANKS_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks' })), getCount('fillBlanksReading', 24)),
+        ...getRandom(MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-r-single' })), getCount('mcSingleReading', 3)),
       ]
     },
     {
       id: 'listening',
       title: 'Listening',
       questions: [
-        ...getRandom(SUMMARIZE_SPOKEN_QUESTIONS.map(q => ({ ...q, type: 'summarize-spoken' })), 2),
-        ...getRandom(MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-l-multi' })), 2),
-        ...getRandom(LISTENING_FILL_BLANKS_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks-listening' })), 3),
-        ...getRandom(HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS.map(q => ({ ...q, type: 'highlight-correct-summary' })), 2),
-        ...getRandom(MULTIPLE_CHOICE_SINGLE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-l-single' })), 2),
-        ...getRandom(SELECT_MISSING_WORD_QUESTIONS.map(q => ({ ...q, type: 'select-missing-word' })), 2),
-        ...getRandom(HIGHLIGHT_INCORRECT_QUESTIONS.map(q => ({ ...q, type: 'highlight-incorrect' })), 3),
-        ...getRandom(WRITE_DICTATION_QUESTIONS.map(q => ({ ...q, type: 'write-dictation' })), 9),
+        ...getRandom(SUMMARIZE_SPOKEN_QUESTIONS.map(q => ({ ...q, type: 'summarize-spoken' })), getCount('summarizeSpoken', 2)),
+        ...getRandom(MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-l-multi' })), getCount('mcListeningMulti', 2)),
+        ...getRandom(LISTENING_FILL_BLANKS_QUESTIONS.map(q => ({ ...q, type: 'fill-blanks-listening' })), getCount('fillBlanksListening', 3)),
+        ...getRandom(HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS.map(q => ({ ...q, type: 'highlight-correct-summary' })), getCount('highlightCorrect', 2)),
+        ...getRandom(MULTIPLE_CHOICE_SINGLE_QUESTIONS.map(q => ({ ...q, type: 'multiple-choice-l-single' })), getCount('mcListeningSingle', 2)),
+        ...getRandom(SELECT_MISSING_WORD_QUESTIONS.map(q => ({ ...q, type: 'select-missing-word' })), getCount('selectMissing', 2)),
+        ...getRandom(HIGHLIGHT_INCORRECT_QUESTIONS.map(q => ({ ...q, type: 'highlight-incorrect' })), getCount('highlightIncorrect', 3)),
+        ...getRandom(WRITE_DICTATION_QUESTIONS.map(q => ({ ...q, type: 'write-dictation' })), getCount('writeDictation', 9)),
       ]
     }
   ];
 
-  return sections;
+  // Filter out empty sections
+  return sections.filter(s => s.questions.length > 0);
 };

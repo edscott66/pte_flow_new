@@ -73,6 +73,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="custom-mock"
+        options={{
+          href: null,
+          title: 'Custom Mock',
+        }}
+      />
     </Tabs>
   );
 }
