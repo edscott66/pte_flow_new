@@ -1,23 +1,36 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { onSnapshot, doc } from 'firebase/firestore';
-import { db } from '@/services/firebase';
-import { scoreService } from '@/services/scoreService';
-import { Alert } from 'react-native';
+import { db } from '../services/firebase';
+import { scoreService } from '../services/scoreService';
+import { Alert, View, TouchableOpacity, Animated, Image, SafeAreaView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 
-import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
 function RootLayoutContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
+  const segments = useSegments();
+
   useEffect(() => {
     // Check Subscription Status on App Open
     const checkSubscription = async () => {
-      const { daysRemaining } = await scoreService.getSubscriptionStatus();
-      if (daysRemaining <= 3) {
+      const { daysRemaining, isActivated, isExpired } = await scoreService.getSubscriptionStatus();
+      
+      const isActivateScreen = segments[0] === 'activate';
+
+      if (!isActivated || isExpired) {
+        if (!isActivateScreen) {
+          router.replace('/activate');
+        }
+        return;
+      }
+      
+      if (daysRemaining <= 3 && !isActivateScreen) {
         Alert.alert(
           "Subscription Alert",
           `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
@@ -70,6 +83,7 @@ function RootLayoutContent() {
           contentStyle: { backgroundColor: colors.background },
         }}
       >
+        <Stack.Screen name="activate" options={{ headerShown: false, gestureEnabled: false }} />
         {/* The Welcome Screen */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         

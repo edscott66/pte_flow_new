@@ -1,5 +1,20 @@
 {
   "entities": {
+    "VerificationCode": {
+      "title": "Verification Code",
+      "description": "A secure activation code for subscriptions",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "The actual string of the code e.g. PTE-XYZ" },
+        "isUsed": { "type": "boolean" },
+        "daysGranted": { "type": "number", "description": "Number of days the code grants" },
+        "usedBy": { "type": "string", "description": "userId of the user who consumed the code" },
+        "usedAt": { "type": "number", "description": "Timestamp when the code was used" },
+        "createdAt": { "type": "number", "description": "Timestamp when the code was created" },
+        "createdBy": { "type": "string", "description": "Admin who created the code" }
+      },
+      "required": ["code", "isUsed", "daysGranted", "createdAt", "createdBy"]
+    },
     "LeaderboardEntry": {
       "title": "Leaderboard Entry",
       "description": "A single entry in the global leaderboard",
@@ -45,6 +60,10 @@
     }
   },
   "firestore": {
+    "/verification_codes/{codeId}": {
+      "schema": "VerificationCode",
+      "description": "Collection of verification codes"
+    },
     "/leaderboard/{userId}": {
       "schema": "LeaderboardEntry",
       "description": "Collection of leaderboard entries keyed by userId"

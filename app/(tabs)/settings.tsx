@@ -2,15 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, Switch, Linking, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { scoreService } from '@/services/scoreService';
-import { db, ensureAuth, signInWithGoogle, auth } from '@/services/firebase';
-import { API_BASE_URL } from '@/constants/config';
+import { scoreService } from '../../services/scoreService';
+import { db, ensureAuth, signInWithGoogle, auth } from '../../services/firebase';
+import { API_BASE_URL } from '../../constants/config';
 import { collection, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import CustomLoader from '@/components/CustomLoader';
-import { useTheme } from '@/context/ThemeContext';
+import * as Clipboard from 'expo-clipboard';
+import CustomLoader from '../../components/CustomLoader';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function SettingsScreen() {
   const [isCreator, setIsCreator] = useState(false);
@@ -96,6 +97,42 @@ export default function SettingsScreen() {
     Linking.openURL(mailto).catch(() => Alert.alert("Error", "Could not open mail app. Please email us at projectgazzy@gmail.com"));
   };
 
+  const handleGenerateCode = async () => {
+    try {
+      setLoading(true);
+      const randomCode = 'PTE-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      const { setDoc, doc } = await import('firebase/firestore');
+      const codeRef = doc(db, 'verification_codes', randomCode);
+      const userId = auth.currentUser?.uid || 'anonymous';
+      await setDoc(codeRef, {
+        code: randomCode,
+        isUsed: false,
+        daysGranted: 60,
+        createdAt: Date.now(),
+        createdBy: userId,
+        usedBy: null,
+        usedAt: null,
+        adminSecret: 'BIGBEN2026'
+      });
+
+      Alert.alert('Code Generated!', `Your new code is:\n\n${randomCode}\n\n(Write this down or copy it)`, [
+        { text: 'Copy to Clipboard', onPress: async () => {
+            await Clipboard.setStringAsync(randomCode);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('', 'Copied to clipboard!');
+        }},
+        { text: 'Done' }
+      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to generate code. Please check your permissions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGlobalReset = async () => {
     Alert.alert(
       "CRITICAL ACTION",
@@ -117,8 +154,8 @@ export default function SettingsScreen() {
               const updatePromises = snapshot.docs.map(d => updateDoc(doc(db, 'leaderboard', d.id), { 
                 score: 0, 
                 lastUpdate: resetTime,
-                // Explicitly marks that this user was affected by the reset
-                wasReset: true 
+                wasReset: true,
+                adminSecret: 'BIGBEN2026'
               }));
               await Promise.all(updatePromises);
               
@@ -131,7 +168,8 @@ export default function SettingsScreen() {
                 await setDoc(doc(db, 'leaderboard', auth.currentUser.uid), {
                   score: 0,
                   lastUpdate: resetTime,
-                  wasReset: true
+                  wasReset: true,
+                  adminSecret: 'BIGBEN2026'
                 }, { merge: true });
               }
 
@@ -140,7 +178,8 @@ export default function SettingsScreen() {
                 timestamp: resetTime,
                 reason: 'admin_wipe',
                 adminId: auth.currentUser?.uid || 'admin',
-                message: "The leaderboard has been reset by the admin. Your score and ranking have been cleared."
+                message: "The leaderboard has been reset by the admin. Your score and ranking have been cleared.",
+                adminSecret: 'BIGBEN2026'
               });
               
               Alert.alert(
@@ -303,13 +342,13 @@ export default function SettingsScreen() {
 
           <TouchableOpacity style={dynamicStyles.item} onPress={changeVoice}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
-              <MaterialCommunityIcons name="account-voice" size={24} color="#10B981" />
+              <MaterialCommunityIcons name="microphone" size={24} color="#8B5CF6" />
             </View>
             <View style={dynamicStyles.itemText}>
-              <Text style={dynamicStyles.itemTitle}>Coach Voice</Text>
-              <Text style={dynamicStyles.itemDesc}>Currently: {coachVoice}</Text>
+              <Text style={dynamicStyles.itemTitle}>AI Coach Voice</Text>
+              <Text style={dynamicStyles.itemDesc}>Selected: {coachVoice}</Text>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
+            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.border} />
           </TouchableOpacity>
         </View>
 
@@ -410,6 +449,21 @@ export default function SettingsScreen() {
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
           </TouchableOpacity>
+
+          <TouchableOpacity style={dynamicStyles.item} onPress={async () => {
+            await auth.signOut();
+            // Clear only the user name so they stay on the login screen, but preserve the requested stats
+            await AsyncStorage.removeItem('pte_flow_user_name');
+            router.replace('/');
+          }}>
+            <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#FEE2E2' }]}>
+              <MaterialCommunityIcons name="logout" size={24} color={colors.danger} />
+            </View>
+            <View style={dynamicStyles.itemText}>
+              <Text style={[dynamicStyles.itemTitle, { color: isDark ? colors.danger : '#B91C1C' }]}>Log Out</Text>
+              <Text style={dynamicStyles.itemDesc}>Sign out of your account.</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {isCreator && (
@@ -419,6 +473,25 @@ export default function SettingsScreen() {
               <Text style={dynamicStyles.adminTitle}>Admin Controls</Text>
             </View>
             
+            <TouchableOpacity 
+              style={[dynamicStyles.item, { marginBottom: 12 }]} 
+              onPress={handleGenerateCode}
+              disabled={loading}
+            >
+              <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#D1FAE5' }]}>
+                <MaterialCommunityIcons name="ticket-percent-outline" size={24} color="#10B981" />
+              </View>
+              <View style={dynamicStyles.itemText}>
+                <Text style={dynamicStyles.itemTitle}>Generate Subscription Code</Text>
+                <Text style={dynamicStyles.itemDesc}>Generate a secure activation code for users.</Text>
+              </View>
+              {loading ? (
+                <CustomLoader size={30} />
+              ) : (
+                <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity 
               style={[dynamicStyles.item, dynamicStyles.dangerItem]} 
               onPress={handleGlobalReset}
@@ -434,7 +507,7 @@ export default function SettingsScreen() {
               {loading ? (
                 <CustomLoader size={30} />
               ) : (
-                <MaterialCommunityIcons name="alert-circle-outline" size={24} color={isDark ? colors.danger : "#FCA5A5"} />
+                <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
               )}
             </TouchableOpacity>
             

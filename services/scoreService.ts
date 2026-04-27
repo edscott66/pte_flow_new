@@ -284,33 +284,42 @@ export const scoreService = {
     await AsyncStorage.setItem(AVATAR_URI_KEY, uri);
   },
 
-  async getSubscriptionStartDate(): Promise<number> {
+  async getSubscriptionStartDate(): Promise<number | null> {
     const key = 'pte_flow_sub_start_date';
     const existing = await AsyncStorage.getItem(key);
     if (existing) {
       return parseInt(existing, 10);
     }
-    const now = Date.now();
-    await AsyncStorage.setItem(key, now.toString());
-    return now;
+    return null;
+  },
+
+  async setSubscriptionStartDate(timestamp: number) {
+    const key = 'pte_flow_sub_start_date';
+    await AsyncStorage.setItem(key, timestamp.toString());
   },
 
   async getSubscriptionStatus() {
     const startDate = await this.getSubscriptionStartDate();
     const msPerDay = 1000 * 60 * 60 * 24;
-    const expiryDate = startDate + (60 * msPerDay);
-    const now = Date.now();
     
-    // Days remaining = expiry date − current date (rounded down)
-    const daysRemaining = Math.floor((expiryDate - now) / msPerDay);
+    let daysRemaining = 0;
+    if (startDate !== null) {
+      const expiryDate = startDate + (60 * msPerDay);
+      daysRemaining = Math.floor((expiryDate - Date.now()) / msPerDay);
+    } else {
+      daysRemaining = 0; // Not activated
+    }
     
     let text = '';
     let color = '';
     
-    if (daysRemaining > 3) {
+    if (startDate === null) {
+      text = `Not Activated`;
+      color = '#EF4444'; // Red
+    } else if (daysRemaining > 3) {
       text = `Active — ${daysRemaining} days remaining`;
       color = '#10B981'; // Green
-    } else if (daysRemaining <= 3 && daysRemaining >= 0) {
+    } else if (daysRemaining <= 3 && daysRemaining > 0) {
       text = `Expires in ${daysRemaining} days`;
       color = '#EF4444'; // Red
     } else {
@@ -322,7 +331,8 @@ export const scoreService = {
       daysRemaining,
       text,
       color,
-      isExpired: daysRemaining < 0
+      isExpired: startDate !== null && daysRemaining <= 0,
+      isActivated: startDate !== null
     };
   },
 

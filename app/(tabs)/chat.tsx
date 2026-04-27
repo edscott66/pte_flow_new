@@ -18,7 +18,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { getPTEChatResponse, synthesizeSpeech } from '../../services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 
 interface Message {
   id: string;
@@ -40,7 +42,6 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAutoRead, setIsAutoRead] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -53,43 +54,57 @@ export default function ChatScreen() {
     loadPrefs();
   }, []);
 
+  const [currentlySpeakingId, setCurrentlySpeakingId] = useState<string | null>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // When the screen is focused, do nothing special for now.
+      return () => {
+        // Automatically switch off the voice if the user leaves the AI Chat page
+        Speech.stop();
+        setCurrentlySpeakingId(null);
+      };
+    }, [])
+  );
+
   const toggleAutoRead = async (value: boolean) => {
     setIsAutoRead(value);
     await AsyncStorage.setItem('pte_chat_auto_read', value.toString());
     if (!value) {
-      stopAudio();
+      Speech.stop();
+      setCurrentlySpeakingId(null);
     }
   };
 
-  const stopAudio = async () => {
-    if (sound) {
-      try {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-      } catch (e) {}
-      setSound(null);
-    }
-  };
-
-  const playTTS = async (text: string) => {
+  const playTTS = async (text: string, id: string) => {
     try {
-      await stopAudio();
-      const uri = await synthesizeSpeech(text);
-      if (uri) {
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true }
-        );
-        setSound(newSound);
-        newSound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            newSound.unloadAsync();
-            setSound(null);
-          }
-        });
+      if (currentlySpeakingId === id) {
+        // Toggle behavior: stop if it's already playing this message
+        Speech.stop();
+        setCurrentlySpeakingId(null);
+        return;
       }
+
+      Speech.stop();
+      setCurrentlySpeakingId(id);
+      
+      const voices = await Speech.getAvailableVoicesAsync();
+      let bestVoice = voices.find(v => v.identifier.includes("Daniel") || v.identifier.includes("Arthur")); 
+      if (!bestVoice) bestVoice = voices.find(v => v.identifier.includes("rjs-local") || v.identifier.includes("gbd-local"));
+      if (!bestVoice) bestVoice = voices.find(v => v.language.includes('en-GB') || v.language.includes('en-UK'));
+
+      Speech.speak(text, {
+        voice: bestVoice?.identifier,
+        language: 'en-GB',
+        pitch: 1.0,
+        rate: 0.9,
+        onDone: () => setCurrentlySpeakingId(null),
+        onStopped: () => setCurrentlySpeakingId(null),
+        onError: () => setCurrentlySpeakingId(null),
+      });
     } catch (error) {
       console.error('TTS Playback error:', error);
+      setCurrentlySpeakingId(null);
     }
   };
 
@@ -115,9 +130,10 @@ export default function ChatScreen() {
       }));
 
       const aiResponse = await getPTEChatResponse(history);
+      const newBotId = (Date.now() + 1).toString();
 
       const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: newBotId,
         role: 'model',
         content: aiResponse,
         timestamp: new Date(),
@@ -126,7 +142,7 @@ export default function ChatScreen() {
       setMessages((prev) => [...prev, botMessage]);
 
       if (isAutoRead) {
-        playTTS(aiResponse);
+        playTTS(aiResponse, newBotId);
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -148,13 +164,12 @@ export default function ChatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-    return () => {
-      stopAudio();
-    };
   }, [messages, isLoading]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isBot = item.role === 'model';
+    const isSpeaking = currentlySpeakingId === item.id;
+    
     return (
       <View
         style={[
@@ -192,13 +207,13 @@ export default function ChatScreen() {
             </Text>
             {isBot && (
               <TouchableOpacity 
-                onPress={() => playTTS(item.content)}
+                onPress={() => playTTS(item.content, item.id)}
                 style={{ marginLeft: 8 }}
               >
                 <MaterialCommunityIcons 
-                  name="volume-high" 
+                  name={isSpeaking ? "stop-circle-outline" : "volume-high"} 
                   size={16} 
-                  color={colors.primary} 
+                  color={isSpeaking ? colors.danger || "#EF4444" : colors.primary} 
                 />
               </TouchableOpacity>
             )}

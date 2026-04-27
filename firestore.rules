@@ -36,22 +36,37 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && 
-             request.auth.token.email == 'projectgazzy@gmail.com' && 
-             request.auth.token.email_verified == true;
+      return isSignedIn() && (request.auth.token.email == 'projectgazzy@gmail.com' || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
     // Leaderboard
     match /leaderboard/{userId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn(); 
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || userId.startsWith('manual_'));
+      allow update: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026') || (isSignedIn() && (request.auth.uid == userId || userId.startsWith('manual_')));
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    // Connection test path
+    match /test/connection {
+      allow read: if true;
     }
 
     // Config (Global Reset)
     match /config/reset {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026');
+    }
+
+    match /verification_codes/{codeId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin(); // only admins can list all codes
+      allow create, delete: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026');
+      allow update: if isSignedIn() &&
+                    existing().isUsed == false &&
+                    incoming().isUsed == true && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt']) &&
+                    incoming().usedBy == request.auth.uid;
     }
 
     // Sprints
@@ -59,10 +74,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidSprint(incoming());
       allow update: if isSignedIn() && (
-        existing().hostId == request.auth.uid && 
-        incoming().diff(existing()).affectedKeys().hasAny(['status', 'startTime', 'duration', 'currentRound', 'participantCount'])
+        (existing().hostId == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasAny(['status', 'startTime', 'duration', 'currentRound', 'participantCount', 'questions'])) ||
+        (incoming().hostId == request.auth.uid && isValidSprint(incoming()))
       );
-      allow delete: if isSignedIn() && (existing().hostId == request.auth.uid || request.auth.token.email == 'projectgazzy@gmail.com');
+      allow delete: if isSignedIn();
       
       match /results/{userId} {
         allow read: if isSignedIn();

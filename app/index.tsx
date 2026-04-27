@@ -3,11 +3,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect, useRef } from 'react';
-import { scoreService } from '@/services/scoreService';
+import { scoreService } from '../services/scoreService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '../services/firebase';
 import { doc, setDoc, getDocs, query, collection, where, limit, orderBy, deleteDoc } from 'firebase/firestore';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function WelcomeScreen() {

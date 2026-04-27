@@ -5,41 +5,41 @@ import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { generateMockExam } from '@/utils/mockExamGenerator';
-import CustomLoader from '@/components/CustomLoader';
-import { useTheme } from '@/context/ThemeContext';
+import { generateMockExam } from '../../utils/mockExamGenerator';
+import CustomLoader from '../../components/CustomLoader';
+import { useTheme } from '../../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
 
 // Import All Data Files
-import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '@/constants/multipleChoiceReadingSingleData';
-import { MODULES } from '@/constants/modules';
-import { READ_ALOUD_QUESTIONS } from '@/constants/readAloudData';
-import { REPEAT_SENTENCE_QUESTIONS } from '@/constants/repeatSentenceData';
-import { DESCRIBE_IMAGE_QUESTIONS } from '@/constants/describeImageData';
-import { REORDER_PARAGRAPHS_QUESTIONS } from '@/constants/reOrderParagraphsData';
-import { FILL_BLANKS_QUESTIONS } from '@/constants/fillBlanksData';
-import { SUMMARIZE_SPOKEN_QUESTIONS } from '@/constants/summarizeSpokenData';
-import { WRITE_DICTATION_QUESTIONS } from '@/constants/writeDictationData';
-import { HIGHLIGHT_INCORRECT_QUESTIONS } from '@/constants/highlightIncorrectData';
-import { MULTIPLE_CHOICE_QUESTIONS } from '@/constants/multipleChoiceData';
-import { SUMMARIZE_WRITTEN_QUESTIONS } from '@/constants/summarizeWrittenData';
-import { RETELL_LECTURE_QUESTIONS } from '@/constants/retellLectureData';
-import { ANSWER_SHORT_QUESTION_DATA } from '@/constants/answerShortQuestionData';
-import { FILL_BLANKS_RW_QUESTIONS } from '@/constants/fillBlanksRWData';
-import { MULTIPLE_CHOICE_SINGLE_QUESTIONS } from '@/constants/multipleChoiceSingleData';
-import { MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS } from '@/constants/multipleChoiceListeningMultiData';
-import { LISTENING_FILL_BLANKS_QUESTIONS } from '@/constants/listeningFillBlanksData';
-import { SELECT_MISSING_WORD_QUESTIONS } from '@/constants/selectMissingWordData';
-import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '@/constants/highlightCorrectSummaryData';
-import { ESSAY_QUESTIONS } from '@/constants/essayData';
-import { SUMMARIZE_GROUP_QUESTIONS } from '@/constants/summarizeGroupData'; 
-import { RESPOND_SITUATION_QUESTIONS } from '@/constants/respondSituationData';
-import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
+import { MULTIPLE_CHOICE_READING_SINGLE_QUESTIONS } from '../../constants/multipleChoiceReadingSingleData';
+import { MODULES } from '../../constants/modules';
+import { READ_ALOUD_QUESTIONS } from '../../constants/readAloudData';
+import { REPEAT_SENTENCE_QUESTIONS } from '../../constants/repeatSentenceData';
+import { DESCRIBE_IMAGE_QUESTIONS } from '../../constants/describeImageData';
+import { REORDER_PARAGRAPHS_QUESTIONS } from '../../constants/reOrderParagraphsData';
+import { FILL_BLANKS_QUESTIONS } from '../../constants/fillBlanksData';
+import { SUMMARIZE_SPOKEN_QUESTIONS } from '../../constants/summarizeSpokenData';
+import { WRITE_DICTATION_QUESTIONS } from '../../constants/writeDictationData';
+import { HIGHLIGHT_INCORRECT_QUESTIONS } from '../../constants/highlightIncorrectData';
+import { MULTIPLE_CHOICE_QUESTIONS } from '../../constants/multipleChoiceData';
+import { SUMMARIZE_WRITTEN_QUESTIONS } from '../../constants/summarizeWrittenData';
+import { RETELL_LECTURE_QUESTIONS } from '../../constants/retellLectureData';
+import { ANSWER_SHORT_QUESTION_DATA } from '../../constants/answerShortQuestionData';
+import { FILL_BLANKS_RW_QUESTIONS } from '../../constants/fillBlanksRWData';
+import { MULTIPLE_CHOICE_SINGLE_QUESTIONS } from '../../constants/multipleChoiceSingleData';
+import { MULTIPLE_CHOICE_LISTENING_MULTI_QUESTIONS } from '../../constants/multipleChoiceListeningMultiData';
+import { LISTENING_FILL_BLANKS_QUESTIONS } from '../../constants/listeningFillBlanksData';
+import { SELECT_MISSING_WORD_QUESTIONS } from '../../constants/selectMissingWordData';
+import { HIGHLIGHT_CORRECT_SUMMARY_QUESTIONS } from '../../constants/highlightCorrectSummaryData';
+import { ESSAY_QUESTIONS } from '../../constants/essayData';
+import { SUMMARIZE_GROUP_QUESTIONS } from '../../constants/summarizeGroupData'; 
+import { RESPOND_SITUATION_QUESTIONS } from '../../constants/respondSituationData';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '../../services/firebase';
 import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
-import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '@/services/geminiService';
-import { scoreService } from '@/services/scoreService';
-import { networkService } from '@/services/networkService';
-import { Config } from '@/constants/config';
+import { analyzeSpeech, analyzeWriting, synthesizeSpeech } from '../../services/geminiService';
+import { scoreService } from '../../services/scoreService';
+import { networkService } from '../../services/networkService';
+import { Config } from '../../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
@@ -935,15 +935,14 @@ export default function ModuleScreen() {
       if (isGeneratingTTS) return;
       setIsGeneratingTTS(true);
       try {
-          // Play the whole sentence through high quality cloud TTS
-          const uri = await synthesizeSpeech(text);
-          if (uri) {
-              playAudioFromUrl(uri, () => setIsGeneratingTTS(false), true);
+          const audioUri = await synthesizeSpeech(text);
+          if (audioUri) {
+              await playAudioFromUrl(audioUri, () => setIsGeneratingTTS(false), true);
           } else {
               speakText(text, () => setIsGeneratingTTS(false), 0.9);
           }
       } catch (e) {
-          setIsGeneratingTTS(false);
+          speakText(text, () => setIsGeneratingTTS(false), 0.9);
       }
   };
 

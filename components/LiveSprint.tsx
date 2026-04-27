@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ScrollView, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { db, auth, ensureAuth } from '@/services/firebase';
+import { db, auth, ensureAuth } from '../services/firebase';
 import { collection, doc, setDoc, onSnapshot, query, where, orderBy, limit, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { networkService } from '@/services/networkService';
-import { useTheme } from '@/context/ThemeContext';
-import { REPEAT_SENTENCE_QUESTIONS } from '@/constants/repeatSentenceData';
-import { FILL_BLANKS_QUESTIONS } from '@/constants/fillBlanksData';
+import { networkService } from '../services/networkService';
+import { useTheme } from '../context/ThemeContext';
+import { REPEAT_SENTENCE_QUESTIONS } from '../constants/repeatSentenceData';
+import { FILL_BLANKS_QUESTIONS } from '../constants/fillBlanksData';
 import { Audio } from 'expo-av';
-import { synthesizeSpeech } from '@/services/geminiService';
+import * as Speech from 'expo-speech';
 
 interface SprintQuestion {
   type: string;
@@ -53,6 +53,37 @@ export const LiveSprint = () => {
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [selectedSprintAnswers, setSelectedSprintAnswers] = useState<string[]>([]);
   
+  const repeatSentenceOptions = useMemo(() => {
+    const text = currentQuestion?.text || 'Correct Option';
+    return [
+       text,
+       text + ' and more.',
+       'Small variation of ' + text,
+       'The speaker mentioned nothing.'
+    ].sort(() => Math.random() - 0.5);
+  }, [currentQuestion?.id, currentQuestion?.text, Math.floor(timeLeft / 3)]);
+
+  // Auto-play audio when question is displayed
+  useEffect(() => {
+    if (showGame && currentQuestion) {
+      const playAudio = async () => {
+        try {
+          if (currentQuestion.audioUrl) {
+            const { sound } = await Audio.Sound.createAsync({ uri: currentQuestion.audioUrl });
+            await sound.playAsync();
+          } else if (currentQuestion.text) {
+            Speech.speak(currentQuestion.text, { language: 'en-GB', pitch: 1.0, rate: 0.9 });
+          }
+        } catch (e) {
+            console.error("Failed to autoplay audio", e);
+        }
+      };
+      // Slight delay to ensure modal is mounted and visible
+      const timer = setTimeout(playAudio, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showGame, currentQuestion?.id, currentQuestion?.text]);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSprintId = useRef<string | null>(null);
   const [currentUid, setCurrentUid] = useState<string | null>(auth.currentUser?.uid || null);
@@ -120,7 +151,8 @@ export const LiveSprint = () => {
     
     // In a real app we'd get this from a profile doc or AsyncStorage
     // For now, let's assume it's in auth or we fetch it
-    setUserName(auth.currentUser?.displayName || 'Student');
+    const localName = await import('../services/scoreService').then(m => m.scoreService.getUserName());
+    setUserName(auth.currentUser?.displayName || localName || 'Student');
 
     if (currentSsid) {
       // Create a deterministic document ID for this network so ghost sprints are always overwritten
@@ -264,14 +296,14 @@ export const LiveSprint = () => {
       
       await setDoc(doc(db, 'sprints', sprintId), {
         hostId: auth.currentUser?.uid,
-        hostName: userName,
+        hostName: userName || 'Host',
         questions: selectedQuestions,
         currentRound: 0,
         participantCount: 0,
         status: 'active',
         startTime: Date.now(),
         duration: 30,
-        ssid: ssid
+        ssid: ssid || 'Unknown'
       });
       // Force loading check bypass just in case async takes too long
       setLoading(false);
@@ -297,7 +329,7 @@ export const LiveSprint = () => {
     try {
       await setDoc(doc(db, `sprints/${activeSprint.id}/results`, auth.currentUser?.uid || 'anon'), {
         userId: auth.currentUser?.uid,
-        userName: userName,
+        userName: userName || 'Student',
         score: newScore,
         timeTaken: newTime,
         completedRounds: currentRound + 1,
@@ -436,12 +468,14 @@ export const LiveSprint = () => {
           {results.length > 0 && (
              <View style={styles.leaderboardOverlay}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.subtext, marginBottom: 8 }}>LIVE STANDINGS</Text>
-                {results.slice(0, 3).map((res, i) => (
-                    <View key={i} style={styles.lbRow}>
-                        <Text style={styles.lbName}>{i+1}. {res.userName}</Text>
-                        <Text style={styles.lbScore}>{res.score}% in {res.timeTaken}s</Text>
-                    </View>
-                ))}
+                <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled={true}>
+                    {results.map((res, i) => (
+                        <View key={i} style={styles.lbRow}>
+                            <Text style={styles.lbName}>{i+1}. {res.userName}</Text>
+                            <Text style={styles.lbScore}>{res.timeTaken}s</Text>
+                        </View>
+                    ))}
+                </ScrollView>
              </View>
           )}
 
@@ -557,7 +591,7 @@ export const LiveSprint = () => {
                                             const { sound } = await Audio.Sound.createAsync({ uri: currentQuestion.audioUrl });
                                             await sound.playAsync();
                                         } else if (currentQuestion?.text) {
-                                            synthesizeSpeech(currentQuestion.text);
+                                            Speech.speak(currentQuestion.text, { language: 'en-GB', pitch: 1.0, rate: 0.9 });
                                         }
                                     }}
                                 >
@@ -607,12 +641,7 @@ export const LiveSprint = () => {
                                 })}
                             </View>
                         ) : (
-                            [
-                                currentQuestion?.text || 'Correct Option',
-                                (currentQuestion?.text || '') + ' and more.',
-                                'Small variation of ' + (currentQuestion?.text || ''),
-                                'The speaker mentioned nothing.'
-                            ].sort(() => Math.random() - 0.5).map((opt, idx) => (
+                            repeatSentenceOptions.map((opt, idx) => (
                                 <TouchableOpacity 
                                     key={idx} 
                                     style={styles.optionBtn} 

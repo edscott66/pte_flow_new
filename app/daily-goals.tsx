@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../constants/config';
 import { generateDailyGoals } from '../logic/daily_goals_engine';
-import { scoreService, PerformanceMetrics } from '@/services/scoreService';
+import { scoreService, PerformanceMetrics } from '../services/scoreService';
 import CustomLoader from '../components/CustomLoader';
 import { useTheme } from '../context/ThemeContext';
 

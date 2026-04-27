@@ -3,9 +3,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { scoreService, RecentActivity } from '@/services/scoreService';
-import { useTheme } from '@/context/ThemeContext';
+import { scoreService, RecentActivity } from '../../services/scoreService';
+import { useTheme } from '../../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
+import { generateDailyGoals } from '../../logic/daily_goals_engine';
 
 // --- PRACTICE MODULES DATA ---
 const PRACTICE_MODULES = [
@@ -52,6 +53,7 @@ export default function HomeScreen() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null);
   const [cfa, setCfa] = useState(0); // Correct First Attempts
   const [ffa, setFfa] = useState(0); // Failed First Attempts
+  const [totalGoalQuestions, setTotalGoalQuestions] = useState(1);
   const { colors, isDark } = useTheme();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -123,6 +125,11 @@ export default function HomeScreen() {
 
         const failedFirsts = await scoreService.getFailedFirstAttempts();
         setFfa(failedFirsts);
+
+        const perf = await scoreService.getPerformance();
+        const goals = generateDailyGoals(perf, 'intermediate', 15);
+        const totalQ = goals.daily_goals.reduce((acc, task) => acc + task.estimated_time_minutes, 0);
+        setTotalGoalQuestions(totalQ > 0 ? totalQ : 15);
       };
       loadData();
     }, [])
@@ -142,6 +149,8 @@ export default function HomeScreen() {
     if (diffDays === 1) return 'Yesterday';
     return `${diffDays} days ago`;
   };
+
+  const progressPercentage = Math.min(100, Math.round(((cfa + ffa) / totalGoalQuestions) * 100));
 
   const dynamicStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -346,10 +355,10 @@ export default function HomeScreen() {
               <Text style={dynamicStyles.progressTitle}>Daily Goal</Text>
               <MaterialCommunityIcons name="chevron-right" size={24} color="#fff" />
             </View>
-            <Text style={dynamicStyles.progressSub}>View your adaptive AI-generated plan</Text>
+            <Text style={dynamicStyles.progressSub}>{cfa + ffa} / {totalGoalQuestions} questions completed</Text>
           </View>
           <View style={dynamicStyles.progressBarBg}>
-            <View style={[dynamicStyles.progressBarFill, { width: '60%' }]} />
+            <View style={[dynamicStyles.progressBarFill, { width: `${progressPercentage}%` }]} />
           </View>
         </TouchableOpacity>
 
