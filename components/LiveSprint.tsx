@@ -181,6 +181,8 @@ export const LiveSprint = () => {
           setActiveSprint(null);
           setShowGame(false);
         }
+      }, (error) => {
+          console.warn("Sprint snapshot detached due to permission or logout", error);
       });
 
       return () => unsubscribe();
@@ -194,6 +196,8 @@ export const LiveSprint = () => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const res = snapshot.docs.map(d => d.data() as ParticipantResult);
         setResults(res);
+      }, (error) => {
+          console.warn("Results snapshot error", error);
       });
       return () => unsubscribe();
     } else {

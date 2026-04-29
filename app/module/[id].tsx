@@ -415,12 +415,10 @@ export default function ModuleScreen() {
         console.log(`[Score] Progress Report updated: Correct Qs = ${newCfa}`);
         showFeedback("+1 on Progress! Well done.", "success");
 
-        // Global Leaderboard logic: only award point if in a group (groupId != userId)
-        const groupId = await scoreService.getGroupId();
+        // Global Leaderboard logic: update score in leaderboard for everyone
         const firebaseUid = auth.currentUser?.uid;
         
-        // Ensure we have both IDs and they are different (meaning user is in someone else's group or has invited others)
-        if (groupId && firebaseUid && groupId !== firebaseUid) {
+        if (firebaseUid) {
           const newScore = await scoreService.addPoint();
           console.log(`[Score] Global Leaderboard Points: ${newScore}`);
           
@@ -431,8 +429,10 @@ export default function ModuleScreen() {
               try {
                 await ensureAuth();
                 const userDocRef = doc(db, 'leaderboard', firebaseUid);
+                const localBackup = await scoreService.getAllLocalData();
                 await setDoc(userDocRef, {
                   score: newScore,
+                  localBackup,
                   lastUpdate: new Date().toISOString()
                 }, { merge: true });
                 console.log("[Score] Global sync successful.");
@@ -442,7 +442,7 @@ export default function ModuleScreen() {
             }
           }
         } else {
-          console.log(`[Score] Not in group (Group: ${groupId}, User: ${firebaseUid}). Global score unchanged.`);
+          console.log(`[Score] Unauthenticated. Global score unchanged.`);
         }
       } else {
         // Incorrect on first attempt
@@ -2451,7 +2451,7 @@ export default function ModuleScreen() {
           </View>
         </ScrollView>
         <View style={{ padding: 20 }}>
-          <TouchableOpacity style={styles.btnPrimary} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.replace('/(tabs)'); }}>
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.replace('/(tabs)/home'); }}>
             <Text style={styles.btnText}>Back to Dashboard</Text>
           </TouchableOpacity>
         </View>

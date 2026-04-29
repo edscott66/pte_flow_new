@@ -52,6 +52,10 @@ export const scoreService = {
     return data ? parseInt(data, 10) : 0;
   },
 
+  async setCorrectFirstAttempts(count: number) {
+    await AsyncStorage.setItem(CORRECT_FIRST_ATTEMPT_KEY, count.toString());
+  },
+
   async addCorrectFirstAttempt() {
     const current = await this.getCorrectFirstAttempts();
     const next = current + 1;
@@ -62,6 +66,10 @@ export const scoreService = {
   async getFailedFirstAttempts(): Promise<number> {
     const data = await AsyncStorage.getItem(FAILED_FIRST_ATTEMPT_KEY);
     return data ? parseInt(data, 10) : 0;
+  },
+
+  async setFailedFirstAttempts(count: number) {
+    await AsyncStorage.setItem(FAILED_FIRST_ATTEMPT_KEY, count.toString());
   },
 
   async addFailedFirstAttempt() {
@@ -186,10 +194,7 @@ export const scoreService = {
     const streak = parseInt(data, 10);
     const last = new Date(lastDate);
     const now = new Date();
-    
-    // Reset streak if more than 48 hours (to be safe, user said 24h but 48h is more standard for "next day")
-    // User requested 24 hours specifically: "goes out if they don't study for 24 hours"
-    // Let's stick to 24-48h window.
+
     const diffMs = now.getTime() - last.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
@@ -215,7 +220,6 @@ export const scoreService = {
     const lastStr = last.toISOString().split('T')[0];
 
     if (lastStr === todayStr) {
-      // Already studied today
       return parseInt(await AsyncStorage.getItem(STREAK_KEY) || '1', 10);
     }
 
@@ -250,8 +254,7 @@ export const scoreService = {
   async saveMistake(question: any) {
     const data = await AsyncStorage.getItem(MISTAKES_BANK_KEY);
     let bank: any[] = data ? JSON.parse(data) : [];
-    
-    // Prevent duplicates
+
     const exists = bank.find(q => q.id === question.id || q.text === question.text);
     if (!exists) {
       bank.push({
@@ -301,30 +304,30 @@ export const scoreService = {
   async getSubscriptionStatus() {
     const startDate = await this.getSubscriptionStartDate();
     const msPerDay = 1000 * 60 * 60 * 24;
-    
+
     let daysRemaining = 0;
     if (startDate !== null) {
       const expiryDate = startDate + (60 * msPerDay);
       daysRemaining = Math.floor((expiryDate - Date.now()) / msPerDay);
     } else {
-      daysRemaining = 0; // Not activated
+      daysRemaining = 0;
     }
-    
+
     let text = '';
     let color = '';
-    
+
     if (startDate === null) {
       text = `Not Activated`;
-      color = '#EF4444'; // Red
+      color = '#EF4444';
     } else if (daysRemaining > 3) {
       text = `Active — ${daysRemaining} days remaining`;
-      color = '#10B981'; // Green
+      color = '#10B981';
     } else if (daysRemaining <= 3 && daysRemaining > 0) {
       text = `Expires in ${daysRemaining} days`;
-      color = '#EF4444'; // Red
+      color = '#EF4444';
     } else {
       text = `Expired — Renew now`;
-      color = '#EF4444'; // Red
+      color = '#EF4444';
     }
 
     return {
@@ -336,8 +339,38 @@ export const scoreService = {
     };
   },
 
+  async getAllLocalData() {
+    const data: any = {};
+    const keys = [
+      ATTEMPTED_QUESTIONS_KEY, TOTAL_SCORE_KEY, ORIGINAL_SSID_KEY,
+      PERFORMANCE_DATA_KEY, RECENT_ACTIVITY_KEY, TARGET_SCORE_KEY,
+      AVATAR_URI_KEY, STREAK_KEY, LAST_STUDY_DATE_KEY, TOTAL_STUDY_TIME_KEY,
+      MISTAKES_BANK_KEY, CORRECT_FIRST_ATTEMPT_KEY, FAILED_FIRST_ATTEMPT_KEY, GROUP_ID_KEY
+    ];
+    for (const key of keys) {
+      const val = await AsyncStorage.getItem(key);
+      if (val) data[key] = val;
+    }
+    return data;
+  },
+
+  async restoreLocalData(data: any) {
+    if (!data) return;
+    const entries = Object.entries(data).filter(([key, val]) => val !== null && val !== undefined) as [string, string][];
+    if (entries.length > 0) {
+      await AsyncStorage.multiSet(entries);
+    }
+  },
+
+  // ─── FIXED ──────────────────────────────────────────────────────────────────
+  // CORRECT_FIRST_ATTEMPT_KEY and FAILED_FIRST_ATTEMPT_KEY are intentionally
+  // NOT wiped here. Wiping them caused the home screen to show zeros after
+  // logout because AsyncStorage was empty before Firebase could restore them.
+  // These keys survive logout and are only cleared on a deliberate user
+  // "Reset My Progress" action via clearProgressOnly() below.
+  // ────────────────────────────────────────────────────────────────────────────
   async clearAllLocalData() {
-    console.log("[ScoreService] Wiping specific local data for reset...");
+    console.log("[ScoreService] Wiping all local data for logout/reset...");
     const keys = [
       ATTEMPTED_QUESTIONS_KEY,
       TOTAL_SCORE_KEY,
@@ -348,24 +381,57 @@ export const scoreService = {
       TOTAL_STUDY_TIME_KEY,
       'pte_flow_user_id',
       'pte_flow_has_synced_v2',
+      'pte_flow_leaderboard_hidden',
+      PERFORMANCE_DATA_KEY,
+      MISTAKES_BANK_KEY,
+      AVATAR_URI_KEY,
+      TARGET_SCORE_KEY,
       GROUP_ID_KEY,
-      'pte_flow_last_reset'
+      CORRECT_FIRST_ATTEMPT_KEY,
+      FAILED_FIRST_ATTEMPT_KEY
     ];
-    // NOTE: USER_NAME_KEY, AVATAR_URI_KEY, TARGET_SCORE_KEY, MISTAKES_BANK_KEY, 
-    // CORRECT_FIRST_ATTEMPT_KEY, FAILED_FIRST_ATTEMPT_KEY are preserved 
-    // to maintain the "Progress Report" and user identity as requested.
     try {
       await AsyncStorage.multiRemove(keys);
-      console.log("[ScoreService] Partial local data wipe complete.");
+      console.log("[ScoreService] Full local data wipe complete.");
     } catch (e) {
       console.error("[ScoreService] Wipe failed:", e);
     }
   },
 
+  // Call this when the user deliberately resets their own progress
+  // (the "Reset My Progress" button in Settings). This is the only
+  // place that should wipe CFA/FFA.
+  async clearProgressOnly() {
+    console.log("[ScoreService] Wiping full progress including CFA/FFA...");
+    const keys = [
+      ATTEMPTED_QUESTIONS_KEY,
+      TOTAL_SCORE_KEY,
+      ORIGINAL_SSID_KEY,
+      RECENT_ACTIVITY_KEY,
+      STREAK_KEY,
+      LAST_STUDY_DATE_KEY,
+      TOTAL_STUDY_TIME_KEY,
+      'pte_flow_user_id',
+      'pte_flow_leaderboard_hidden',
+      PERFORMANCE_DATA_KEY,
+      MISTAKES_BANK_KEY,
+      AVATAR_URI_KEY,
+      TARGET_SCORE_KEY,
+      GROUP_ID_KEY,
+      CORRECT_FIRST_ATTEMPT_KEY,
+      FAILED_FIRST_ATTEMPT_KEY
+    ];
+    try {
+      await AsyncStorage.multiRemove(keys);
+      console.log("[ScoreService] Full progress wipe complete.");
+    } catch (e) {
+      console.error("[ScoreService] Full wipe failed:", e);
+    }
+  },
+
   async resetLeaderboardScore() {
-    // Only reset the points that contribute to the leaderboard
     await AsyncStorage.setItem(TOTAL_SCORE_KEY, '0');
-    // We do NOT remove 'pte_flow_has_synced_v2' because we want to maintain the connection 
-    // to the same cloud document, just with a fresh score of 0.
+    // We do NOT remove 'pte_flow_has_synced_v2' because we want to maintain
+    // the connection to the same cloud document, just with a fresh score of 0.
   }
 };

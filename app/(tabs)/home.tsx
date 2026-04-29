@@ -7,6 +7,11 @@ import { scoreService, RecentActivity } from '../../services/scoreService';
 import { useTheme } from '../../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
 import { generateDailyGoals } from '../../logic/daily_goals_engine';
+// ─── FIXED: added Firebase imports to restore scores from cloud on load ───────
+import { db, auth } from '../../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// ─────────────────────────────────────────────────────────────────────────────
 
 // --- PRACTICE MODULES DATA ---
 const PRACTICE_MODULES = [
@@ -110,20 +115,51 @@ export default function HomeScreen() {
       const loadData = async () => {
         const activity = await scoreService.getRecentActivity();
         setRecentActivity(activity);
-        
+
         const currentStreak = await scoreService.getStreak();
         setStreak(currentStreak);
-        
+
         const studyTime = await scoreService.getTotalStudyTime();
         setTotalStudyTime(studyTime);
 
         const mistakes = await scoreService.getMistakes();
         setMistakeCount(mistakes.length);
 
-        const correctFirsts = await scoreService.getCorrectFirstAttempts();
-        setCfa(correctFirsts);
+        // ─── FIXED ────────────────────────────────────────────────────────────
+        // Previously: read cfa/ffa from AsyncStorage only. After logout,
+        // clearAllLocalData() wiped AsyncStorage so both returned 0 even though
+        // Firebase held the real scores. Now: if both are zero AND a Firebase
+        // user is signed in, we fetch the cloud score and restore it locally
+        // before displaying — so the home screen always shows the correct totals
+        // immediately on load rather than catching up after a few questions.
+        // ─────────────────────────────────────────────────────────────────────
+        let correctFirsts = await scoreService.getCorrectFirstAttempts();
+        let failedFirsts = await scoreService.getFailedFirstAttempts();
 
-        const failedFirsts = await scoreService.getFailedFirstAttempts();
+        if (correctFirsts === 0 && failedFirsts === 0 && auth.currentUser) {
+          try {
+            const uid =
+              (await AsyncStorage.getItem('pte_flow_user_id')) ||
+              auth.currentUser.uid;
+            const snap = await getDoc(doc(db, 'leaderboard', uid));
+            if (snap.exists()) {
+              const data = snap.data();
+              const cloudScore = data.score || 0;
+              if (cloudScore > 0) {
+                // Restore cloud score into local storage so subsequent reads
+                // are instant and don't need another network round-trip.
+                await scoreService.setScore(cloudScore);
+                await scoreService.setCorrectFirstAttempts(cloudScore);
+                correctFirsts = cloudScore;
+              }
+            }
+          } catch (e) {
+            console.warn('[Home] Could not fetch score from Firebase:', e);
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        setCfa(correctFirsts);
         setFfa(failedFirsts);
 
         const perf = await scoreService.getPerformance();
@@ -155,13 +191,13 @@ export default function HomeScreen() {
   const dynamicStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scroll: { padding: 20 },
-    
+
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
     welcomeText: { fontSize: 14, color: colors.subtext },
     userName: { fontSize: 24, fontWeight: 'bold', color: colors.text },
     profileButton: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface },
     avatarImage: { width: '100%', height: '100%', borderRadius: 24 },
-  
+
     progressReportCard: {
       backgroundColor: colors.surface,
       padding: 20,
@@ -187,13 +223,13 @@ export default function HomeScreen() {
     progressSub: { color: isDark ? '#BFDBFE' : '#BFDBFE', fontSize: 14, marginBottom: 12, opacity: 0.8 },
     progressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4 },
     progressBarFill: { height: '100%', backgroundColor: '#fff', borderRadius: 4 },
-  
-    mockExamCard: { 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      backgroundColor: '#10B981', 
-      padding: 20, 
-      borderRadius: 20, 
+
+    mockExamCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#10B981',
+      padding: 20,
+      borderRadius: 20,
       marginBottom: 12,
       shadowColor: '#10B981',
       shadowOpacity: 0.3,
@@ -201,11 +237,11 @@ export default function HomeScreen() {
       elevation: 5,
     },
     customMockCard: {
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      backgroundColor: '#8B5CF6', 
-      padding: 20, 
-      borderRadius: 20, 
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#8B5CF6',
+      padding: 20,
+      borderRadius: 20,
       marginBottom: 24,
       shadowColor: '#8B5CF6',
       shadowOpacity: 0.3,
@@ -217,15 +253,15 @@ export default function HomeScreen() {
     mockExamTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
     mockExamSub: { color: '#D1FAE5', fontSize: 12 },
     customMockSub: { color: '#EDE9FE', fontSize: 12 },
-  
+
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 16 },
-    
+
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    moduleCard: { 
-      backgroundColor: colors.surface, 
-      width: '48%', 
-      padding: 20, 
-      borderRadius: 20, 
+    moduleCard: {
+      backgroundColor: colors.surface,
+      width: '48%',
+      padding: 20,
+      borderRadius: 20,
       marginBottom: 16,
       shadowColor: '#000',
       shadowOpacity: 0.05,
@@ -235,12 +271,12 @@ export default function HomeScreen() {
     iconContainer: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
     moduleTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
     moduleTasks: { fontSize: 12, color: colors.subtext },
-  
-    activityCard: { 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      backgroundColor: colors.surface, 
-      padding: 16, 
+
+    activityCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      padding: 16,
       borderRadius: 16,
       shadowColor: '#000',
       shadowOpacity: 0.05,
@@ -250,14 +286,14 @@ export default function HomeScreen() {
     activityInfo: { flex: 1 },
     activityTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
     activityTime: { fontSize: 12, color: colors.subtext, marginTop: 2 },
-    
+
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 12 },
-    statBox: { 
-      flex: 1, 
-      backgroundColor: colors.surface, 
-      padding: 16, 
-      borderRadius: 16, 
-      flexDirection: 'row', 
+    statBox: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 16,
+      flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border
@@ -266,11 +302,11 @@ export default function HomeScreen() {
     statLabel: { fontSize: 12, color: colors.subtext, marginLeft: 8 },
 
     mistakesCard: {
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      backgroundColor: isDark ? '#450a0a' : '#fef2f2', 
-      padding: 20, 
-      borderRadius: 20, 
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#450a0a' : '#fef2f2',
+      padding: 20,
+      borderRadius: 20,
       marginBottom: 24,
       borderWidth: 1,
       borderColor: isDark ? '#991b1b' : '#fecaca',
@@ -284,7 +320,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <ScrollView contentContainerStyle={dynamicStyles.scroll}>
-        
+
         {/* Header with User Name */}
         <View style={dynamicStyles.header}>
           <View>
@@ -346,7 +382,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Daily Progress Card */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={dynamicStyles.progressCard}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/daily-goals'); }}
         >
@@ -363,8 +399,8 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* Mock Exam Section */}
-        <TouchableOpacity 
-          style={dynamicStyles.mockExamCard} 
+        <TouchableOpacity
+          style={dynamicStyles.mockExamCard}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/module/mock-exam'); }}
         >
           <View style={dynamicStyles.mockExamIcon}>
@@ -378,8 +414,8 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* Custom Mock Exam Section */}
-        <TouchableOpacity 
-          style={dynamicStyles.customMockCard} 
+        <TouchableOpacity
+          style={dynamicStyles.customMockCard}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/custom-mock'); }}
         >
           <View style={dynamicStyles.mockExamIcon}>
@@ -393,11 +429,11 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* Mistakes Bank Section */}
-        <TouchableOpacity 
-          style={dynamicStyles.mistakesCard} 
-          onPress={() => { 
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
-            router.push('/module/mistakes'); 
+        <TouchableOpacity
+          style={dynamicStyles.mistakesCard}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/module/mistakes');
           }}
         >
           <View style={dynamicStyles.mistakesIcon}>
@@ -414,8 +450,8 @@ export default function HomeScreen() {
         <Text style={dynamicStyles.sectionTitle}>Practice Modules</Text>
         <View style={dynamicStyles.grid}>
           {PRACTICE_MODULES.map((module) => (
-            <TouchableOpacity 
-              key={module.id} 
+            <TouchableOpacity
+              key={module.id}
               style={dynamicStyles.moduleCard}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/module/${module.id}`); }}
             >
@@ -432,7 +468,7 @@ export default function HomeScreen() {
         {recentActivity && (
           <>
             <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={dynamicStyles.activityCard}
               onPress={() => router.push(`/module/${recentActivity.moduleId}?startIndex=${recentActivity.questionIndex}`)}
             >

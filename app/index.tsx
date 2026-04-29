@@ -5,8 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect, useRef } from 'react';
 import { scoreService } from '../services/scoreService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '../services/firebase';
-import { doc, setDoc, getDocs, query, collection, where, limit, orderBy, deleteDoc } from 'firebase/firestore';
+import { db, auth, ensureAuth, disableAutoLogin, enableAutoLogin, isAutoLoginPrevented, handleFirestoreError, OperationType } from '../services/firebase';
+import { doc, getDoc, setDoc, getDocs, query, collection, where, limit, orderBy, deleteDoc } from 'firebase/firestore';
 import { useTheme } from '../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -45,30 +45,38 @@ export default function WelcomeScreen() {
   }, []);
 
   const checkUser = async () => {
+    disableAutoLogin(); // <— prevents auto-login on welcome screen
     const savedName = await scoreService.getUserName();
     
     // Check if we already have a creator
     const isCreator = await scoreService.getIsCreator();
     
     // If no creator is set locally, check if the cloud is empty
-    if (!isCreator) {
-      try {
-        await ensureAuth();
-        const q = query(collection(db, 'leaderboard'), limit(1));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-          console.log("[Admin] Cloud is empty. First user will be Creator.");
-          await scoreService.setIsCreator(true);
+      if (!isCreator) {
+        try {
+          if (!isAutoLoginPrevented()) {
+            await ensureAuth();
+          }
+
+          const q = query(collection(db, 'leaderboard'), limit(1));
+          const snapshot = await getDocs(q);
+
+          if (snapshot.empty) {
+            console.log("[Admin] Cloud is empty. First user will be Creator.");
+            await scoreService.setIsCreator(true);
+          }
+
+        } catch (e) {
+          console.error("Failed to check creator status", e);
         }
-      } catch (e) {
-        console.error("Failed to check creator status", e);
       }
-    }
+
 
     if (savedName) {
       // Even if logged in, sync with leaderboard to ensure name is there
+      enableAutoLogin();
       await syncWithLeaderboard(savedName);
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/home');
     }
     setLoading(false);
   };
@@ -88,22 +96,58 @@ export default function WelcomeScreen() {
       const attempted = await scoreService.getAttemptedQuestions();
       
       try {
-        // First check if we need to "import" a legacy score by name
+        // First check if we need to "import" a legacy score
         const hasSyncedBefore = await AsyncStorage.getItem('pte_flow_has_synced_v2');
         if (!hasSyncedBefore) {
             console.log(`[Firebase Sync] First sync for ${userName}. Checking for legacy data...`);
-            const q = query(collection(db, 'leaderboard'), where('name', '==', userName), orderBy('score', 'desc'), limit(1));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const legacyData = querySnapshot.docs[0].data() as any;
+            
+            let legacyData: any = null;
+            // 1. Try fetching by Firebase UID first (Master Record)
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                legacyData = docSnap.data();
+                console.log(`[Firebase Sync] Found existing cloud backup by UID! Restoring...`);
+            } else {
+                // 2. Fallback to name search for backward compatibility
+                const q = query(collection(db, 'leaderboard'), where('name', '==', userName));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    // Sort locally to avoid needing a composite index on Firestore
+                    const docs = querySnapshot.docs.map(d => d.data());
+                    docs.sort((a, b) => {
+                        const dateA = a.lastUpdate ? new Date(a.lastUpdate).getTime() : 0;
+                        const dateB = b.lastUpdate ? new Date(b.lastUpdate).getTime() : 0;
+                        if (dateB !== dateA) return dateB - dateA;
+                        // Tie breaker: whoever has the most keys in localBackup (find the richest record, not a wiped one)
+                        const countA = a.localBackup ? Object.keys(a.localBackup).length : 0;
+                        const countB = b.localBackup ? Object.keys(b.localBackup).length : 0;
+                        return countB - countA;
+                    });
+                    legacyData = docs[0];
+                    console.log(`[Firebase Sync] Found existing cloud backup by name! Restoring...`);
+                }
+            }
+
+            if (legacyData) {
                 if (legacyData.score > currentScore) {
                     currentScore = legacyData.score;
                     await scoreService.setScore(currentScore);
+                }
+                if (legacyData.groupId) {
+                    await scoreService.setGroupId(legacyData.groupId);
                 }
                 const legacyAttempted = legacyData.attemptedQuestions || [];
                 const localAttempted = await scoreService.getAttemptedQuestions();
                 const merged = Array.from(new Set([...localAttempted, ...legacyAttempted]));
                 await scoreService.setAttemptedQuestions(merged);
+                
+                // Restore all other local data if available
+                if (legacyData.localBackup) {
+                    console.log(`[Firebase Sync] Restoring local backup keys:`, Object.keys(legacyData.localBackup));
+                    await scoreService.restoreLocalData(legacyData.localBackup);
+                    // Update variables that might have been loaded before this block
+                    currentScore = await scoreService.getScore();
+                }
             }
             await AsyncStorage.setItem('pte_flow_has_synced_v2', 'true');
             await AsyncStorage.setItem('pte_flow_user_id', userId);
@@ -116,12 +160,16 @@ export default function WelcomeScreen() {
           await scoreService.setGroupId(userId);
         }
 
+        // Generate full local backup to sync to Firebase
+        const localBackup = await scoreService.getAllLocalData();
+
         await setDoc(userDocRef, {
           userId,
           name: userName,
           score: currentScore,
           groupId: groupId,
           attemptedQuestions: attempted,
+          localBackup,
           lastUpdate: new Date().toISOString()
         }, { merge: true });
         console.log("User successfully synced to Firebase Leaderboard");
@@ -138,12 +186,13 @@ export default function WelcomeScreen() {
       Alert.alert("Wait!", "Please enter your name to continue.");
       return;
     }
+    enableAutoLogin();
     const trimmedName = name.trim();
     await scoreService.setUserName(trimmedName);
     
     await syncWithLeaderboard(trimmedName);
 
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/home');
   };
 
   if (loading) return null;

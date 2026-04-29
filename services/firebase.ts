@@ -6,17 +6,32 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
-  initializeAuth,
+  initializeAuth
 } from 'firebase/auth';
+// @ts-ignore
+import { getReactNativePersistence } from 'firebase/auth';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import firebaseConfig from './firebase-applet-config.json';
 import { Platform } from 'react-native';
+
+// 🔐 Prevent auto-login after logout
+let preventAutoLogin = false;
+
+export const disableAutoLogin = () => {
+  preventAutoLogin = true;
+};
+
+export const enableAutoLogin = () => {
+  preventAutoLogin = false;
+};
+
+export const isAutoLoginPrevented = () => preventAutoLogin;
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+const isWeb = Platform.OS === 'web';
 
 // Initialize Auth with platform-specific persistence
 let authInstance;
@@ -24,31 +39,12 @@ let authInstance;
 if (isWeb) {
   authInstance = getAuth(app);
 } else {
-  // Use dynamic logic to find getReactNativePersistence to avoid bundling errors on web
-  let reactNativePersistence: any = null;
   try {
-    // In Firebase 11, it might be in the main package or a subpath
-    // We try to access it safely
-    const authModule: any = require('firebase/auth');
-    reactNativePersistence = authModule.getReactNativePersistence;
-    
-    if (!reactNativePersistence && authModule.default) {
-      reactNativePersistence = authModule.default.getReactNativePersistence;
-    }
+    authInstance = initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+    });
   } catch (e) {
-    console.log("Firebase persistence resolution effort: ", e);
-  }
-
-  if (reactNativePersistence) {
-    try {
-      authInstance = initializeAuth(app, {
-        persistence: reactNativePersistence(ReactNativeAsyncStorage)
-      });
-    } catch (e) {
-      console.warn("Native persistence initialization failed, falling back to default.", e);
-      authInstance = getAuth(app);
-    }
-  } else {
+    console.warn("Native persistence initialization failed, falling back to default.", e);
     authInstance = getAuth(app);
   }
 }
@@ -117,7 +113,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Ensure anonymous auth for security rules if needed
 export const ensureAuth = async () => {
-  if (!auth.currentUser) {
+  if (!auth.currentUser && !preventAutoLogin) {
     try {
       await signInAnonymously(auth);
     } catch (error) {
@@ -125,3 +121,4 @@ export const ensureAuth = async () => {
     }
   }
 };
+

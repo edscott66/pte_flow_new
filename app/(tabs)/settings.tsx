@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '../../services/scoreService';
-import { db, ensureAuth, signInWithGoogle, auth } from '../../services/firebase';
+import { db, ensureAuth, signInWithGoogle, auth, disableAutoLogin } from '../../services/firebase';
 import { API_BASE_URL } from '../../constants/config';
 import { collection, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -26,7 +26,7 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       scoreService.getIsCreator().then(setIsCreator);
-      
+
       const loadSubscription = async () => {
         const details = await scoreService.getSubscriptionStatus();
         setSubscriptionDetails(details);
@@ -55,7 +55,7 @@ export default function SettingsScreen() {
       { name: 'Kore (Female)', id: 'Kore' },
       { name: 'Zephyr (Deep)', id: 'Zephyr' },
     ];
-    
+
     Alert.alert(
       "Choose Coach Voice",
       "Select a preferred voice for AI responses.",
@@ -101,7 +101,7 @@ export default function SettingsScreen() {
     try {
       setLoading(true);
       const randomCode = 'PTE-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      
+
       const { setDoc, doc } = await import('firebase/firestore');
       const codeRef = doc(db, 'verification_codes', randomCode);
       const userId = auth.currentUser?.uid || 'anonymous';
@@ -117,11 +117,13 @@ export default function SettingsScreen() {
       });
 
       Alert.alert('Code Generated!', `Your new code is:\n\n${randomCode}\n\n(Write this down or copy it)`, [
-        { text: 'Copy to Clipboard', onPress: async () => {
+        {
+          text: 'Copy to Clipboard', onPress: async () => {
             await Clipboard.setStringAsync(randomCode);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('', 'Copied to clipboard!');
-        }},
+          }
+        },
         { text: 'Done' }
       ]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -133,57 +135,67 @@ export default function SettingsScreen() {
     }
   };
 
+  // ─── FIXED ──────────────────────────────────────────────────────────────────
+  // Two fixes applied here:
+  // 1. getIdToken(true) forces a fresh Firebase Auth token before any Firestore
+  //    writes. Without this, request.auth.token.email may be stale/missing and
+  //    the isAdmin() rule in Firestore returns false, causing the permission error.
+  // 2. updateDoc replaced with setDoc+merge. updateDoc sends only the changed
+  //    fields, which can leave the Firestore rule validator without enough context
+  //    to confirm the adminSecret check passes cleanly.
+  // ────────────────────────────────────────────────────────────────────────────
   const handleGlobalReset = async () => {
     Alert.alert(
       "CRITICAL ACTION",
       "This will reset ALL student scores to zero on the global leaderboard. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "RESET ALL SCORES", 
+        {
+          text: "RESET ALL SCORES",
           style: "destructive",
           onPress: async () => {
             try {
               setLoading(true);
-              
-              // 1. Reset all leaderboard docs in cloud to 0 points
+
+              // FIX 1: Force a fresh token so isAdmin() passes in Firestore rules
+              const user = auth.currentUser;
+              if (!user) {
+                Alert.alert("Error", "You must be logged in to perform this action.");
+                setLoading(false);
+                return;
+              }
+              await user.getIdToken(true);
+
+              const resetTime = new Date().toISOString();
               const q = collection(db, 'leaderboard');
               const snapshot = await getDocs(q);
-              
-              const resetTime = new Date().toISOString();
-              const updatePromises = snapshot.docs.map(d => updateDoc(doc(db, 'leaderboard', d.id), { 
-                score: 0, 
-                lastUpdate: resetTime,
-                wasReset: true,
-                adminSecret: 'BIGBEN2026'
-              }));
-              await Promise.all(updatePromises);
-              
-              // 2. Local State Management for admin
-              await AsyncStorage.setItem('pte_flow_last_reset', resetTime);
-              await scoreService.resetLeaderboardScore();
 
-              // 3. Specifically ensure current user's doc is 0 in cloud too
-              if (auth.currentUser?.uid) {
-                await setDoc(doc(db, 'leaderboard', auth.currentUser.uid), {
+              // FIX 2: Use setDoc with merge instead of updateDoc
+              const resetPromises = snapshot.docs.map(d =>
+                setDoc(doc(db, 'leaderboard', d.id), {
                   score: 0,
                   lastUpdate: resetTime,
                   wasReset: true,
                   adminSecret: 'BIGBEN2026'
-                }, { merge: true });
-              }
+                }, { merge: true })
+              );
+              await Promise.all(resetPromises);
 
-              // 4. Send Global Reset Signal (triggers reset for all other active users)
+              // Local cleanup for admin
+              await AsyncStorage.setItem('pte_flow_last_reset', resetTime);
+              await scoreService.resetLeaderboardScore();
+
+              // Send Global Reset Signal to all active listeners
               await setDoc(doc(db, 'config', 'reset'), {
                 timestamp: resetTime,
                 reason: 'admin_wipe',
-                adminId: auth.currentUser?.uid || 'admin',
+                adminId: user.uid,
                 message: "The leaderboard has been reset by the admin. Your score and ranking have been cleared.",
                 adminSecret: 'BIGBEN2026'
               });
-              
+
               Alert.alert(
-                "Success", 
+                "Success",
                 "Global Leaderboard has been reset to zero. Your personal progress report and name have been preserved. The app will now restart.",
                 [{ text: "OK", onPress: () => router.replace('/') }]
               );
@@ -199,17 +211,47 @@ export default function SettingsScreen() {
     );
   };
 
+  // ─── FIXED ──────────────────────────────────────────────────────────────────
+  // Now calls clearProgressOnly() which also wipes CFA/FFA keys, since this is
+  // a deliberate user-initiated full reset. The regular clearAllLocalData() used
+  // on logout intentionally keeps CFA/FFA to prevent the home screen showing zeros.
+  // ────────────────────────────────────────────────────────────────────────────
   const handleLocalReset = async () => {
     Alert.alert(
-      "Reset My Data",
-      "This will clear your score and name from this phone only.",
+      "Reset My Progress",
+      "This will clear your progress report, daily streaks, global leaderboard score, and all saved data. You will start completely fresh.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Reset", 
+        {
+          text: "Reset",
+          style: 'destructive',
           onPress: async () => {
-            await scoreService.clearAllLocalData();
-            router.replace('/');
+            setLoading(true);
+            try {
+              const firebaseUid = auth.currentUser?.uid;
+              if (firebaseUid) {
+                // Clear the cloud data for this user entirely
+                await setDoc(doc(db, 'leaderboard', firebaseUid), {
+                  score: 0,
+                  attemptedQuestions: [],
+                  localBackup: {},
+                  lastUpdate: new Date().toISOString()
+                });
+              }
+              await scoreService.clearProgressOnly();
+              await AsyncStorage.removeItem('pte_flow_user_name');
+              
+              // We must KEEP the synced flag so it doesn't immediately
+              // try to download legacy backup from their name if available!
+              await AsyncStorage.setItem('pte_flow_has_synced_v2', 'true');
+              
+              router.replace('/');
+            } catch (e) {
+              console.warn("Reset error:", e);
+              Alert.alert("Error", "Could not fully reset cloud data.");
+            } finally {
+              setLoading(false);
+            }
           }
         }
       ]
@@ -249,17 +291,17 @@ export default function SettingsScreen() {
     header: { padding: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     title: { fontSize: 28, fontWeight: 'bold', color: colors.text },
     subtitle: { fontSize: 14, color: colors.subtext, marginTop: 4 },
-    
+
     content: { flex: 1 },
-    
+
     section: { marginTop: 24, paddingHorizontal: 16 },
     sectionTitle: { fontSize: 14, fontWeight: 'bold', color: isDark ? colors.subtext : '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginLeft: 8 },
-    
-    item: { 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      backgroundColor: colors.surface, 
-      padding: 16, 
+
+    item: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      padding: 16,
       borderRadius: 16,
       marginBottom: 12,
       shadowColor: '#000',
@@ -272,18 +314,17 @@ export default function SettingsScreen() {
     itemTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text },
     itemUrl: { fontSize: 11, color: colors.primary, marginTop: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
     itemDesc: { fontSize: 12, color: colors.subtext, marginTop: 2 },
-    
+
     adminSection: { marginTop: 32, paddingBottom: 32 },
     adminHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginLeft: 8, gap: 6 },
     adminTitle: { fontSize: 14, fontWeight: 'bold', color: colors.danger, textTransform: 'uppercase', letterSpacing: 1 },
     dangerItem: { borderColor: isDark ? colors.danger : '#FEE2E2', borderWidth: 1 },
     adminNote: { fontSize: 12, color: colors.subtext, textAlign: 'center', marginTop: 12, fontStyle: 'italic' },
-    
+
     footer: { padding: 40, alignItems: 'center' },
     version: { fontSize: 12, fontWeight: 'bold', color: colors.border },
     copyright: { fontSize: 10, color: colors.border, marginTop: 4 },
 
-    // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalContent: { width: '100%', maxWidth: 340, backgroundColor: colors.surface, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8, textAlign: 'center' },
@@ -304,13 +345,13 @@ export default function SettingsScreen() {
       <ScrollView style={dynamicStyles.content}>
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Appearance & Study</Text>
-          
+
           <View style={dynamicStyles.item}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
-              <MaterialCommunityIcons 
-                name={isDark ? "weather-night" : "weather-sunny"} 
-                size={24} 
-                color={isDark ? "#3B82F6" : "#F59E0B"} 
+              <MaterialCommunityIcons
+                name={isDark ? "weather-night" : "weather-sunny"}
+                size={24}
+                color={isDark ? "#3B82F6" : "#F59E0B"}
               />
             </View>
             <View style={dynamicStyles.itemText}>
@@ -354,7 +395,7 @@ export default function SettingsScreen() {
 
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>PTE Quick Guide</Text>
-          
+
           <TouchableOpacity style={dynamicStyles.item} onPress={() => handleOpenLink('https://www.pearsonpte.com/')}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
               <MaterialCommunityIcons name="earth" size={24} color="#0EA5E9" />
@@ -391,7 +432,7 @@ export default function SettingsScreen() {
 
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Support & Feedback</Text>
-          
+
           <TouchableOpacity style={dynamicStyles.item} onPress={() => handleFeedback('bug')}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
               <MaterialCommunityIcons name="bug-outline" size={24} color={colors.danger} />
@@ -415,7 +456,7 @@ export default function SettingsScreen() {
 
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Account</Text>
-          
+
           <View style={[dynamicStyles.item, { borderLeftWidth: 4, borderLeftColor: subscriptionDetails.color }]}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
               <MaterialCommunityIcons name="timer-sand" size={24} color={subscriptionDetails.color} />
@@ -438,7 +479,7 @@ export default function SettingsScreen() {
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={dynamicStyles.item} onPress={handleLocalReset}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
               <MaterialCommunityIcons name="account-remove" size={24} color={colors.subtext} />
@@ -450,10 +491,54 @@ export default function SettingsScreen() {
             <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
           </TouchableOpacity>
 
+          {/* ─── FIXED LOGOUT HANDLER ─────────────────────────────────────────────
+              Critical order change: auth.signOut() now happens BEFORE
+              clearAllLocalData(). Previously, the sync function would fire on
+              next login, read score=0 from freshly-wiped AsyncStorage, and
+              overwrite the Firebase backup with 0. Signing out first closes the
+              Firebase session so no sync can fire with stale local data.
+          ──────────────────────────────────────────────────────────────────────── */}
           <TouchableOpacity style={dynamicStyles.item} onPress={async () => {
-            await auth.signOut();
-            // Clear only the user name so they stay on the login screen, but preserve the requested stats
+            disableAutoLogin();
+
+            // Step 1: Back up current score to Firebase while still authenticated
+            try {
+              const userName = await scoreService.getUserName();
+              const firebaseUid = auth.currentUser?.uid;
+              if (userName && firebaseUid) {
+                const localBackup = await scoreService.getAllLocalData();
+                const score = await scoreService.getScore();
+                const attempted = await scoreService.getAttemptedQuestions();
+                const groupId = await scoreService.getGroupId() || firebaseUid;
+                const userDocRef = doc(db, 'leaderboard', firebaseUid);
+
+                await setDoc(userDocRef, {
+                  userId: firebaseUid,
+                  name: userName,
+                  score,
+                  groupId,
+                  attemptedQuestions: attempted,
+                  localBackup,
+                  lastUpdate: new Date().toISOString()
+                }, { merge: true });
+                console.log("[Settings] Final backup to cloud complete.");
+              }
+            } catch (backupError) {
+              console.warn("Failed to backup before logout:", backupError);
+            }
+
+            // Step 2: Sign out FIRST — closes Firebase session so no sync
+            // can fire and overwrite the backup we just saved with score=0
+            try {
+              await auth.signOut();
+            } catch (e) {
+              console.warn("Sign out error", e);
+            }
+
+            // Step 3: Now safe to wipe local data — Firebase session is closed
+            await scoreService.clearAllLocalData();
             await AsyncStorage.removeItem('pte_flow_user_name');
+
             router.replace('/');
           }}>
             <View style={[dynamicStyles.iconContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#FEE2E2' }]}>
@@ -472,9 +557,9 @@ export default function SettingsScreen() {
               <MaterialCommunityIcons name="shield-check" size={20} color={colors.danger} />
               <Text style={dynamicStyles.adminTitle}>Admin Controls</Text>
             </View>
-            
-            <TouchableOpacity 
-              style={[dynamicStyles.item, { marginBottom: 12 }]} 
+
+            <TouchableOpacity
+              style={[dynamicStyles.item, { marginBottom: 12 }]}
               onPress={handleGenerateCode}
               disabled={loading}
             >
@@ -492,8 +577,8 @@ export default function SettingsScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[dynamicStyles.item, dynamicStyles.dangerItem]} 
+            <TouchableOpacity
+              style={[dynamicStyles.item, dynamicStyles.dangerItem]}
               onPress={handleGlobalReset}
               disabled={loading}
             >
@@ -510,7 +595,7 @@ export default function SettingsScreen() {
                 <MaterialCommunityIcons name="chevron-right" size={24} color={colors.border} />
               )}
             </TouchableOpacity>
-            
+
             <Text style={dynamicStyles.adminNote}>
               Note: You are seeing these controls because you are the creator of this group.
             </Text>
@@ -536,7 +621,7 @@ export default function SettingsScreen() {
           <View style={dynamicStyles.modalContent}>
             <Text style={dynamicStyles.modalTitle}>Admin Access</Text>
             <Text style={dynamicStyles.modalDesc}>Enter the management access code to unlock administrative controls.</Text>
-            
+
             <TextInput
               style={dynamicStyles.modalInput}
               placeholder="Enter Code"
@@ -548,15 +633,15 @@ export default function SettingsScreen() {
             />
 
             <View style={dynamicStyles.modalButtons}>
-              <TouchableOpacity 
-                style={[dynamicStyles.modalButton, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]} 
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}
                 onPress={() => { setAdminModalVisible(false); setAdminCode(''); }}
               >
                 <Text style={[dynamicStyles.modalButtonText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[dynamicStyles.modalButton, { backgroundColor: colors.primary }]} 
+
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, { backgroundColor: colors.primary }]}
                 onPress={handleAdminVerify}
               >
                 <Text style={[dynamicStyles.modalButtonText, { color: '#fff' }]}>Unlock</Text>
@@ -569,4 +654,4 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({}); // Placeholder if needed
+const styles = StyleSheet.create({});
