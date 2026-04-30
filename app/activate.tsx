@@ -4,10 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { db, auth } from '../services/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { scoreService } from '../services/scoreService';
 import { useTheme } from '../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ActivateScreen() {
   const [code, setCode] = useState('');
@@ -23,6 +24,9 @@ export default function ActivateScreen() {
 
     setLoading(true);
     try {
+      const userId = auth.currentUser?.uid || 'anonymous';
+      const deviceId = await AsyncStorage.getItem('device_id') || 'unknown';
+      
       // 1. Fetch code from Firestore
       const codeRef = doc(db, 'verification_codes', code.trim().toUpperCase());
       const snap = await getDoc(codeRef);
@@ -35,18 +39,46 @@ export default function ActivateScreen() {
 
       // 2. Check if already used
       if (data.isUsed) {
-        throw new Error('This code has already been used.');
+        // Check if this code was used by the current user (reinstall recovery)
+        if (data.usedBy === userId || data.deviceId === deviceId) {
+          // Allow reactivation for same user/device
+          console.log("[Activate] Re-activating previously used code for same user");
+          await scoreService.setSubscriptionStartDate(Date.now());
+          
+          // Store activation in cloud for recovery
+          await setDoc(doc(db, 'user_activations', userId), {
+            activationCode: code.trim().toUpperCase(),
+            activatedAt: Date.now(),
+            deviceId: deviceId,
+            lastReactivation: Date.now()
+          }, { merge: true });
+          
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Welcome Back!', 'Your subscription has been restored.', [
+            { text: 'Continue', onPress: () => router.replace('/') }
+          ]);
+          return;
+        }
+        throw new Error('This code has already been used on another device.');
       }
 
-      // 3. Mark as used
-      const userId = auth.currentUser?.uid || 'anonymous';
+      // 3. First time activation - Mark as used with device info
       await updateDoc(codeRef, {
         isUsed: true,
         usedBy: userId,
-        usedAt: Date.now()
+        usedAt: Date.now(),
+        deviceId: deviceId
       });
 
-      // 4. Update local sub start date
+      // 4. Store activation in cloud for future recovery
+      await setDoc(doc(db, 'user_activations', userId), {
+        activationCode: code.trim().toUpperCase(),
+        activatedAt: Date.now(),
+        deviceId: deviceId,
+        subscriptionStartDate: Date.now()
+      }, { merge: true });
+
+      // 5. Update local sub start date
       await scoreService.setSubscriptionStartDate(Date.now());
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
@@ -61,7 +93,7 @@ export default function ActivateScreen() {
     }
   };
 
-  const isMasterCode = code.trim().toUpperCase() === 'MASTER-CODE'; // As the user requested "an administrator default code that will work every time"
+  const isMasterCode = code.trim().toUpperCase() === 'MASTER-CODE';
 
   const handleBypass = async () => {
     setLoading(true);

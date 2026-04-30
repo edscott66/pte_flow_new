@@ -1,44 +1,90 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef } from 'react';
-import { onSnapshot, doc } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
+import { onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { scoreService } from '../services/scoreService';
-import { Alert, View, TouchableOpacity, Animated, Image, SafeAreaView, Platform } from 'react-native';
+import { Alert, View, TouchableOpacity, Animated, Image, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { auth } from '../services/firebase';
 
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
 function RootLayoutContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-
   const segments = useSegments();
+  const [isRestoring, setIsRestoring] = useState(true);
 
   useEffect(() => {
-    // Check Subscription Status on App Open
-    const checkSubscription = async () => {
-      const { daysRemaining, isActivated, isExpired } = await scoreService.getSubscriptionStatus();
-      
-      const isActivateScreen = segments[0] === 'activate';
-
-      if (!isActivated || isExpired) {
+    // Check Subscription Status and Attempt Cloud Restore
+    const checkSubscriptionAndRestore = async () => {
+      try {
+        const userId = auth.currentUser?.uid;
+        
+        // First check local subscription
+        let { daysRemaining, isActivated, isExpired } = await scoreService.getSubscriptionStatus();
+        
+        // If not activated locally, try to restore from cloud
+        if (!isActivated && userId) {
+          console.log("[Layout] Local activation not found, attempting cloud restore...");
+          
+          const userActivationRef = doc(db, 'user_activations', userId);
+          const activationSnap = await getDoc(userActivationRef);
+          
+          if (activationSnap.exists()) {
+            const activationData = activationSnap.data();
+            if (activationData.subscriptionStartDate) {
+              // Restore subscription from cloud
+              await scoreService.setSubscriptionStartDate(activationData.subscriptionStartDate);
+              console.log("[Layout] Successfully restored subscription from cloud");
+              
+              // Re-check status after restore
+              const restoredStatus = await scoreService.getSubscriptionStatus();
+              isActivated = restoredStatus.isActivated;
+              isExpired = restoredStatus.isExpired;
+              daysRemaining = restoredStatus.daysRemaining;
+            }
+          }
+        }
+        
+        const isActivateScreen = segments[0] === 'activate';
+        
+        // Handle navigation based on activation status
+        if (!isActivated || isExpired) {
+          if (!isActivateScreen) {
+            console.log("[Layout] Redirecting to activate screen");
+            router.replace('/activate');
+          }
+        } else {
+          // User is activated, ensure they're not on activate screen
+          if (isActivateScreen) {
+            router.replace('/');
+          }
+          
+          // Show warning for expiring soon (3 days or less)
+          if (daysRemaining <= 3 && daysRemaining > 0) {
+            Alert.alert(
+              "Subscription Alert",
+              `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
+              [{ text: "OK" }]
+            );
+          }
+        }
+      } catch (error) {
+        console.error("[Layout] Error in subscription check:", error);
+        // On error, default to showing activate screen to be safe
+        const isActivateScreen = segments[0] === 'activate';
         if (!isActivateScreen) {
           router.replace('/activate');
         }
-        return;
-      }
-      
-      if (daysRemaining <= 3 && !isActivateScreen) {
-        Alert.alert(
-          "Subscription Alert",
-          `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
-          [{ text: "OK" }]
-        );
+      } finally {
+        setIsRestoring(false);
       }
     };
-    checkSubscription();
+    
+    checkSubscriptionAndRestore();
 
     // Listen for Global Reset Signal
     const unsubscribe = onSnapshot(doc(db, 'config', 'reset'), async (snapshot: any) => {
@@ -70,7 +116,16 @@ function RootLayoutContent() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [segments]);
+
+  // Show loading screen while restoring
+  if (isRestoring) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <>

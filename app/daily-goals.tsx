@@ -39,6 +39,22 @@ const MotionView = (props: any) => {
   return <View {...rest} />;
 };
 
+// Cross-platform helper to get API base URL
+const getApiBaseUrl = (): string => {
+  // For native platforms, use the stored URL or API_BASE_URL
+  if (Platform.OS !== 'web') {
+    return API_BASE_URL;
+  }
+  
+  // For web platform only, try to get the current origin
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.origin;
+  }
+  
+  // Fallback for any other case
+  return API_BASE_URL;
+};
+
 export default function DailyGoalsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -565,22 +581,20 @@ export default function DailyGoalsScreen() {
       console.log('[DEBUG] Starting fetchGoals...');
       
       const activeUrl = overrideUrl !== undefined ? overrideUrl : apiUrl;
-      let fetchUrl = activeUrl ? `${activeUrl}/api/daily-goals` : '/api/daily-goals';
+      // FIXED: Cross-platform URL construction without window reference
+      let fetchUrl = activeUrl ? `${activeUrl}/api/daily-goals` : `${getApiBaseUrl()}/api/daily-goals`;
       
-      if (!activeUrl && Platform.OS !== 'web') {
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        if (origin && origin.includes('run.app')) {
-          fetchUrl = `${origin}/api/daily-goals`;
-        }
-      }
-      
-      console.log(`[DEBUG] Attempting fetch from: ${fetchUrl}`);
+      console.log(`[DEBUG] Platform: ${Platform.OS}, Fetch URL: ${fetchUrl}`);
       
       // Get the most up-to-date performance
       const perf = await scoreService.getPerformance();
       setUserPerformance(perf);
 
       try {
+        // Add timeout for fetch to prevent hanging on native
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const response = await fetch(fetchUrl, {
           method: 'POST',
           headers: {
@@ -592,7 +606,10 @@ export default function DailyGoalsScreen() {
             level: level,
             time_available: timeAvailable
           }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const contentType = response.headers.get('content-type');
@@ -904,6 +921,3 @@ function getIconForSkill(skill: string) {
     default: return 'target';
   }
 }
-
-
-// Styles are now dynamic and managed via useMemo inside the component
