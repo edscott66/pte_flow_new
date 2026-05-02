@@ -142,6 +142,34 @@ const MOCK_EXAM_SECTIONS_INFO = [
   }
 ];
 
+const LFibInput = React.memo(({ i, item, value, lFibResult, handleLFibChange, styles }: any) => {
+  return (
+    <TextInput 
+      key={`input-${i}`}
+      style={[
+        styles.inlineInput, 
+        { 
+          minWidth: 120,
+          marginHorizontal: 4, 
+          height: 38,
+          paddingVertical: 0,
+          backgroundColor: '#fff',
+          fontSize: 16,
+          borderBottomWidth: 2,
+          borderBottomColor: '#2563EB'
+        },
+        lFibResult ? (value?.trim().toLowerCase() === item.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
+      ]} 
+      placeholder="..." 
+      value={value || ""} 
+      onChangeText={(text) => handleLFibChange(text, i)} 
+      editable={!lFibResult} 
+      autoCapitalize="none" 
+      autoCorrect={false}
+    />
+  );
+});
+
 const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, handleLFibChange, styles }: any) => {
   return (
     <ScrollView 
@@ -155,35 +183,19 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
           const words = segment.split(/(\s+)/);
           return (
             <React.Fragment key={`frag-${i}`}>
-              {words.map((word, wIdx) => (
+              {words.map((word: string, wIdx: number) => (
                 <Text key={`word-${i}-${wIdx}`} style={styles.fibText}>
                   {word}
                 </Text>
               ))}
               {i < item.segments.length - 1 && (
-                <TextInput 
-                  key={`input-${i}`}
-                  style={[
-                    styles.inlineInput, 
-                    { 
-                      minWidth: 100,
-                      width: Math.max(100, (lFibAnswers[i]?.length || 0) * 8 + 30), 
-                      marginHorizontal: 4, 
-                      height: 38,
-                      paddingVertical: 0,
-                      backgroundColor: '#fff',
-                      fontSize: 16,
-                      borderBottomWidth: 2,
-                      borderBottomColor: '#2563EB'
-                    },
-                    lFibResult ? (lFibAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i]?.toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
-                  ]} 
-                  placeholder="..." 
-                  value={lFibAnswers[i] || ""} 
-                  onChangeText={(text) => handleLFibChange(text, i)} 
-                  editable={!lFibResult} 
-                  autoCapitalize="none" 
-                  autoCorrect={false}
+                <LFibInput 
+                  i={i}
+                  item={item}
+                  value={lFibAnswers[i]}
+                  lFibResult={lFibResult}
+                  handleLFibChange={handleLFibChange}
+                  styles={styles}
                 />
               )}
             </React.Fragment>
@@ -191,6 +203,13 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
         })}
       </View>
     </ScrollView>
+  );
+},(prevProps, nextProps) => {
+  // Custom equality check to prevent full re-renders unless data really changes
+  return (
+    prevProps.item === nextProps.item &&
+    prevProps.lFibResult === nextProps.lFibResult &&
+    prevProps.lFibAnswers.join(',') === nextProps.lFibAnswers.join(',')
   );
 });
 
@@ -1280,9 +1299,13 @@ export default function ModuleScreen() {
           awardPointIfFirstAttempt(pts >= 0.8);
           setResult(res);
           setMode('RESULT');
-        } catch (e) { 
+        } catch (e: any) { 
           console.error("Analysis Error:", e);
-          Alert.alert("Error", "AI Analysis Failed. Please try again."); 
+          if (e.message === "GEMINI_API_KEY_MISSING") {
+            Alert.alert("Missing API Key", "Your build is missing the EXPO_PUBLIC_GEMINI_API_KEY environment variable. If using EAS Build, add it via 'eas secret:create' or in the Expo Dashboard.");
+          } else {
+            Alert.alert("Error", "AI Analysis Failed. Please try again."); 
+          }
           setMode('IDLE'); 
         }
       } else {
@@ -1358,9 +1381,13 @@ export default function ModuleScreen() {
     setScoredQuestions(prev => ({...prev, [currentIndex]: ptsForSession}));
     awardPointIfFirstAttempt(ptsForSession === 1);
 
-  } catch (e) {
+  } catch (e: any) {
     console.error("Retry Error:", e);
-    Alert.alert("Analysis Failed", "The AI couldn't process the audio.");
+    if (e.message === "GEMINI_API_KEY_MISSING") {
+      Alert.alert("Missing API Key", "Your build is missing the EXPO_PUBLIC_GEMINI_API_KEY environment variable.");
+    } else {
+      Alert.alert("Analysis Failed", "The AI couldn't process the audio.");
+    }
     setMode('IDLE');
   }
 };
@@ -1451,8 +1478,13 @@ export default function ModuleScreen() {
       setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
       awardPointIfFirstAttempt(pts >= 0.8);
       setMode('RESULT');
-    } catch (error) {
-      Alert.alert("Error", "AI Scoring failed.");
+    } catch (error: any) {
+      console.error("AI Writing Analysis Error:", error);
+      if (error.message === "GEMINI_API_KEY_MISSING") {
+        Alert.alert("Missing API Key", "Your build is missing the EXPO_PUBLIC_GEMINI_API_KEY environment variable. If using EAS Build, add it via 'eas secret:create' or in the Expo Dashboard.");
+      } else {
+        Alert.alert("Error", "AI Scoring failed. Please try again.");
+      }
       setMode('IDLE');
     }
   };
@@ -1652,7 +1684,7 @@ export default function ModuleScreen() {
     }
     const correct = questions[currentIndex].correctAnswers; let score = 0; rwAnswers.forEach((ans, index) => { if (ans.trim().toLowerCase() === correct[index].toLowerCase()) score++; }); const points = score / correct.length; setScoredQuestions(prev => ({...prev, [currentIndex]: points})); awardPointIfFirstAttempt(score === correct.length); setRwResult({ score, max: correct.length }); setMode('RESULT'); 
   };
-  const handleLFibChange = (text: string, index: number) => { const newAnswers = [...lFibAnswers]; newAnswers[index] = text; setLFibAnswers(newAnswers); };
+  const handleLFibChange = React.useCallback((text: string, index: number) => { setLFibAnswers(prev => { const newAnswers = [...prev]; newAnswers[index] = text; return newAnswers; }); }, []);
   const checkLFibAnswer = () => { 
     if (lFibAnswers.some(ans => !ans || ans.trim() === "")) {
       Alert.alert("Wait!", "Please complete the exercise before submitting your answers.");

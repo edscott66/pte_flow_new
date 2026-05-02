@@ -6,21 +6,7 @@ const isWeb = typeof window !== 'undefined';
 // The shared URL (ais-pre) is more accessible for mobile apps than the dev URL.
 const AIS_APP_URL = "https://ais-pre-p7pekcpklsxlfphmw34a56-565384667751.europe-west2.run.app";
 
-/**
- * Access environment variables safely in Expo/Web/Node environments
- * Fixed: Avoids direct 'process.env' access which can cause issues with Expo's virtual env
- */
-const getEnvVar = (name: string): string | undefined => {
-  try {
-    const g = (typeof globalThis !== 'undefined' ? globalThis : typeof global !== 'undefined' ? global : typeof window !== 'undefined' ? window : {}) as any;
-    const env = g.process?.env || (typeof process !== 'undefined' ? process.env : undefined) || {};
-    return env[name];
-  } catch (e) {
-    return undefined;
-  }
-};
-
-const rawApiUrl = getEnvVar('EXPO_PUBLIC_API_URL');
+const rawApiUrl = process.env.EXPO_PUBLIC_API_URL;
 let resolvedUrl = rawApiUrl || AIS_APP_URL;
 
 // On AIS, dev URLs often have cors/auth restrictions, so we preference pre-production

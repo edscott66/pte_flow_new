@@ -15,11 +15,9 @@ let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
   if (!aiInstance) {
-    const g = (typeof global !== 'undefined' ? global : typeof window !== 'undefined' ? window : {}) as any;
-    const env = g['process'] ? g['process']['env'] : {};
-    const apiKey = env.EXPO_PUBLIC_GEMINI_API_KEY || env.GEMINI_API_KEY;
+    const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey === "MISSING_API_KEY") {
-      throw new Error("GEMINI_API_KEY is not set. Please add EXPO_PUBLIC_GEMINI_API_KEY to your .env file and restart the server with 'npx expo start -c'.");
+      throw new Error("GEMINI_API_KEY_MISSING");
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }

@@ -19,10 +19,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.pteflow.app",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_WIFI_STATE",
@@ -31,11 +32,6 @@
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO"
       ]
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
@@ -62,7 +58,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "ca9a064c-2123-45b9-aff2-cafea1e8b285"
+        "projectId": "your-project-id-here"
       }
     }
   }

@@ -18,9 +18,19 @@ export const MODULES: ModuleType[] = [
   // ============================================================
   // PART 1: SPEAKING & WRITING
   // ============================================================
+    {
+    id: 'personal-introduction',
+    title: '1. Personal Introduction',
+    category: 'Part 1: Speaking & Writing',
+    icon: 'account-tie-voice',
+    description: 'A short, non‑scored recording to introduce yourself.',
+    instructions: 'Speak for up to 30 seconds to introduce yourself.',
+    tips: 'Speak clearly, stay calm, and give a confident 30‑second snapshot of who you are.',
+    mockContent: 'Audio...',
+  },
   {
     id: 'read-aloud',
-    title: '1. Read Aloud',
+    title: '2. Read Aloud',
     category: 'Part 1: Speaking & Writing',
     icon: 'microphone-variant',
     description: 'Read a passage aloud. Scored on pronunciation, fluency, and intonation.',
@@ -30,7 +40,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'repeat-sentence',
-    title: '2. Repeat Sentence',
+    title: '3. Repeat Sentence',
     category: 'Part 1: Speaking & Writing',
     icon: 'replay',
     description: 'Repeat the sentence exactly as you hear it.',
@@ -40,7 +50,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'describe-image',
-    title: '3. Describe Image',
+    title: '4. Describe Image',
     category: 'Part 1: Speaking & Writing',
     icon: 'chart-bar',
     description: 'Describe the image specifically.',
@@ -50,7 +60,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'retell-lecture',
-    title: '4. Re-tell Lecture',
+    title: '5. Re-tell Lecture',
     category: 'Part 1: Speaking & Writing',
     icon: 'microphone',
     description: 'Listen to a lecture and retell it in your own words.',
@@ -60,7 +70,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'answer-short-question',
-    title: '5. Answer Short Questions',
+    title: '6. Answer Short Questions',
     category: 'Part 1: Speaking & Writing',
     icon: 'comment-question-outline',
     description: 'Answer a simple question with a single word or a few words.',
@@ -70,7 +80,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'summarize-written',
-    title: '6. Summarize Written Text',
+    title: '7. Summarize Written Text',
     category: 'Part 1: Speaking & Writing',
     icon: 'text-box-check-outline',
     description: 'Read a passage and summarize it in one sentence.',
@@ -80,7 +90,7 @@ export const MODULES: ModuleType[] = [
   },
   {
     id: 'essay',
-    title: '7. Essay',
+    title: '8. Essay',
     category: 'Part 1: Speaking & Writing',
     icon: 'file-document-edit-outline',
     description: 'Write a 200-300 word essay on a given topic.',
