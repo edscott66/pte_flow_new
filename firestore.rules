@@ -58,6 +58,11 @@ service cloud.firestore {
       allow write: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026');
     }
 
+    // User Activations
+    match /user_activations/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
     match /verification_codes/{codeId} {
       allow get: if isSignedIn();
       allow list: if isAdmin(); // only admins can list all codes

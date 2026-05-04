@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { onSnapshot, doc, getDoc } from 'firebase/firestore';
@@ -15,7 +15,9 @@ function RootLayoutContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const segments = useSegments();
+  const navigationState = useRootNavigationState();
   const [isRestoring, setIsRestoring] = useState(true);
+  const [targetRoute, setTargetRoute] = useState<string | null>(null);
 
   useEffect(() => {
     // Check Subscription Status and Attempt Cloud Restore
@@ -54,13 +56,13 @@ function RootLayoutContent() {
         // Handle navigation based on activation status
         if (!isActivated || isExpired) {
           if (!isActivateScreen) {
-            console.log("[Layout] Redirecting to activate screen");
-            router.replace('/activate');
+            console.log("[Layout] Need to redirect to activate screen");
+            setTargetRoute('/activate');
           }
         } else {
           // User is activated, ensure they're not on activate screen
           if (isActivateScreen) {
-            router.replace('/');
+            setTargetRoute('/');
           }
           
           // Show warning for expiring soon (3 days or less)
@@ -77,7 +79,7 @@ function RootLayoutContent() {
         // On error, default to showing activate screen to be safe
         const isActivateScreen = segments[0] === 'activate';
         if (!isActivateScreen) {
-          router.replace('/activate');
+          setTargetRoute('/activate');
         }
       } finally {
         setIsRestoring(false);
@@ -117,6 +119,13 @@ function RootLayoutContent() {
 
     return () => unsubscribe();
   }, [segments]);
+
+  useEffect(() => {
+    if (!isRestoring && targetRoute && navigationState?.key) {
+      router.replace(targetRoute as any);
+      setTargetRoute(null);
+    }
+  }, [isRestoring, targetRoute, router, navigationState?.key]);
 
   // Show loading screen while restoring
   if (isRestoring) {

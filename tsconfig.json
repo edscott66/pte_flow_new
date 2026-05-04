@@ -41,7 +41,9 @@
     "logic/**/*",
     "main.tsx",
     "App.tsx",
-    "types.tsx"
+    "types.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
   ],
   "exclude": [
     "node_modules",

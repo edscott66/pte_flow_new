@@ -3242,17 +3242,18 @@ export default function ModuleScreen() {
           setActiveRwBlankIndex(null);
         }}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => {
-            setActiveBlankIndex(null);
-            setActiveRwBlankIndex(null);
-          }}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback 
+            onPress={() => {
+              setActiveBlankIndex(null);
+              setActiveRwBlankIndex(null);
+            }}
+          >
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
           <View style={styles.dropdownModalContent}>
             <Text style={styles.dropdownTitle}>Select an Answer</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled={true}>
               {(activeBlankIndex !== null ? questions[currentIndex]?.options : questions[currentIndex]?.options)?.map((option: string, idx: number) => (
                 <TouchableOpacity 
                   key={idx} 
@@ -3276,7 +3277,7 @@ export default function ModuleScreen() {
               <Text style={styles.dropdownCloseText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Score Feedback Popup - Now at the end to ensure it's on top of other modals */}
