@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '../../services/scoreService';
 import { db, ensureAuth, signInWithGoogle, auth, disableAutoLogin } from '../../services/firebase';
 import { API_BASE_URL } from '../../constants/config';
-import { collection, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -170,20 +170,19 @@ export default function SettingsScreen() {
               const q = collection(db, 'leaderboard');
               const snapshot = await getDocs(q);
 
-              // FIX 2: Use setDoc with merge instead of updateDoc
-              const resetPromises = snapshot.docs.map(d =>
-                setDoc(doc(db, 'leaderboard', d.id), {
-                  score: 0,
-                  lastUpdate: resetTime,
-                  wasReset: true,
-                  adminSecret: 'BIGBEN2026'
-                }, { merge: true })
-              );
+              // FIX 2: Delete documents for all users except the host
+              const resetPromises = snapshot.docs.map(d => {
+                if (d.id === user.uid) {
+                  return Promise.resolve(); // Keep host intact
+                }
+                return deleteDoc(doc(db, 'leaderboard', d.id));
+              });
               await Promise.all(resetPromises);
 
               // Local cleanup for admin
               await AsyncStorage.setItem('pte_flow_last_reset', resetTime);
-              await scoreService.resetLeaderboardScore();
+              // Do NOT reset the admin's local score so it stays identical to the progress report
+              // await scoreService.resetLeaderboardScore();
 
               // Send Global Reset Signal to all active listeners
               await setDoc(doc(db, 'config', 'reset'), {

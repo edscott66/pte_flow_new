@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ScrollView, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db, auth, ensureAuth } from '../services/firebase';
-import { collection, doc, setDoc, onSnapshot, query, where, orderBy, limit, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, where, orderBy, limit, deleteDoc, serverTimestamp, getDoc, getDocs } from 'firebase/firestore';
 import { networkService } from '../services/networkService';
 import { useTheme } from '../context/ThemeContext';
 import { REPEAT_SENTENCE_QUESTIONS } from '../constants/repeatSentenceData';
@@ -304,14 +304,14 @@ export const LiveSprint = () => {
         questions: selectedQuestions,
         currentRound: 0,
         participantCount: 0,
-        status: 'active',
+        status: 'waiting',
         startTime: Date.now(),
         duration: 30,
         ssid: ssid || 'Unknown'
       });
       // Force loading check bypass just in case async takes too long
       setLoading(false);
-      setShowGame(true); // Open the UI immediately for the host
+      // Removed setShowGame(true) so host stays on waiting screen
     } catch (e: any) {
       console.error("Sprint Creation Error:", e);
       Alert.alert("Execution Error", e?.message || "Could not start sprint. Check logs.");
@@ -365,6 +365,10 @@ export const LiveSprint = () => {
           { text: "Cancel", style: "cancel" },
           { text: "Clear", style: "destructive", onPress: async () => {
               try {
+                  const q = query(collection(db, `sprints/${activeSprint.id}/results`));
+                  const snapshot = await getDocs(q);
+                  const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                  await Promise.all(deletePromises);
                   await deleteDoc(doc(db, 'sprints', activeSprint.id));
               } catch (e) {
                   console.error(e);
@@ -449,24 +453,46 @@ export const LiveSprint = () => {
           </Text>
           
           {(activeSprint.hostId === currentUid || auth.currentUser?.email === 'projectgazzy@gmail.com') ? (
-              (activeSprint.status === 'active' && timeLeft > 0) && (
-                  <View style={{ gap: 8, marginTop: 12 }}>
-                      <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={endSprint}>
-                        <Text style={styles.hostBtnText}>End Sprint Early</Text>
-                      </TouchableOpacity>
-                      {!showGame && (
-                          <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => setShowGame(true)}>
-                              <Text style={styles.hostBtnText}>Return to Game</Text>
-                          </TouchableOpacity>
-                      )}
-                  </View>
-              )
+              <>
+                {(activeSprint.status === 'waiting') && (
+                    <View style={{ gap: 8, marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => {
+                            setDoc(doc(db, 'sprints', activeSprint.id), { status: 'active', startTime: Date.now() }, { merge: true });
+                            setShowGame(true);
+                        }}>
+                            <Text style={styles.hostBtnText}>Start Sprint Now</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={clearSprint}>
+                            <Text style={styles.hostBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+                {(activeSprint.status === 'active' && timeLeft > 0) && (
+                    <View style={{ gap: 8, marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={endSprint}>
+                          <Text style={styles.hostBtnText}>End Sprint Early</Text>
+                        </TouchableOpacity>
+                        {!showGame && (
+                            <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => setShowGame(true)}>
+                                <Text style={styles.hostBtnText}>Return to Game</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+              </>
           ) : (
-              (!hasSubmitted && activeSprint.status === 'active' && timeLeft > 0) && (
-                <TouchableOpacity style={[styles.hostBtn, { marginTop: 12 }]} onPress={() => setShowGame(true)}>
-                    <Text style={styles.hostBtnText}>Join Now</Text>
-                </TouchableOpacity>
-              )
+              <>
+                {(activeSprint.status === 'waiting') && (
+                    <View style={{ marginTop: 12, padding: 12, alignItems: 'center' }}>
+                        <Text style={{fontWeight: 'bold', color: colors.subtext}}>Waiting for host to start...</Text>
+                    </View>
+                )}
+                {(!hasSubmitted && activeSprint.status === 'active' && timeLeft > 0) && (
+                  <TouchableOpacity style={[styles.hostBtn, { marginTop: 12 }]} onPress={() => setShowGame(true)}>
+                      <Text style={styles.hostBtnText}>Join Now</Text>
+                  </TouchableOpacity>
+                )}
+              </>
           )}
           
           {results.length > 0 && (

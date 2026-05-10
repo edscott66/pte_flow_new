@@ -741,7 +741,7 @@ export const SELECT_MISSING_WORD_QUESTIONS = [
   title: 'Reading Skills',
   question: 'Select the missing word:',
   audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/select_missing_word/63.mp3',
-  transcript: "Teachers encourage students to read regularly to improve vocabulary and comprehension. Reading different types of texts helps learners understand new ideas and develop stronger language skills. With regular practice, students usually notice clear improvement in their overall reading...",
+  transcript: "Teachers encourage students to read regularly to improve vocabulary and comprehension. Reading different types of texts helps learners understand new ideas and develop stronger language skills. With regular practice, students usually notice clear improvement in their overall...",
   options: [
     { id: '1', text: 'leading' },
     { id: '2', text: 'reasoning' },

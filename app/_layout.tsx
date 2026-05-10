@@ -100,7 +100,12 @@ function RootLayoutContent() {
           
           // Check if we are already logged in
           const name = await scoreService.getUserName();
-          if (name) {
+          
+          // Do not apply the wipe to the admin who initiated it
+          const isHost = data.adminId && auth.currentUser?.uid === data.adminId;
+          const isAdmin = auth.currentUser?.email === 'projectgazzy@gmail.com';
+          
+          if (name && !isHost && !isAdmin) {
             // Set flag to hide other users on leaderboard until a new group is joined
             await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'true');
             

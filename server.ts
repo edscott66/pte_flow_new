@@ -1,23 +1,22 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import multer from "multer";
 import cors from "cors";
 import fs from "fs";
 import "dotenv/config";
 import getDailyGoalsHandler from "./api/get_daily_goals";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Fallback for __dirname if needed, though process.cwd() is safer
+const currentDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
 
 // Strict production detection
 const distPath = path.resolve(process.cwd(), "dist");
-// Only trust isProd if NODE_ENV is production OR if it's explicitly set.
-// Avoid defaulting to Prod just because a dist folder exists if we are clearly in dev.
-const isProd = process.env.NODE_ENV === "production";
+// Only trust isProd if NODE_ENV is production or running deep inside dist
+const isProd = process.env.NODE_ENV === "production" || currentDir.includes("dist");
+
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const app = express();
 
   console.log(`[FORENSIC] Booting Server...`);

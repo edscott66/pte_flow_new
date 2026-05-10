@@ -56,8 +56,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemColorScheme = useColorScheme();
-  const [theme, setTheme] = useState<Theme>(systemColorScheme || 'light');
+  const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
     AsyncStorage.getItem('app_theme').then((savedTheme) => {

@@ -9,7 +9,7 @@ import { networkService } from '@/services/networkService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/context/ThemeContext';
 import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '@/services/firebase';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, limit, where, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, limit, where, updateDoc } from 'firebase/firestore';
 import { Image } from 'react-native';
 import CustomLoader from '@/components/CustomLoader';
 import { LiveSprint } from '@/components/LiveSprint';
@@ -33,6 +33,7 @@ export default function Leaderboard() {
   const [userName, setUserName] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myGroupId, setMyGroupId] = useState<string | null>(null);
+  const [userScore, setUserScore] = useState<number>(0);
 
   const [isResetActive, setIsResetActive] = useState(false);
   const [hasCheckedReset, setHasCheckedReset] = useState(false);
@@ -41,12 +42,13 @@ export default function Leaderboard() {
     checkNetwork();
     scoreService.getUserName().then(name => setUserName(name || 'Student'));
     
-    let unsubscribe: any;
-
-    const setupListener = async () => {
-      setLoading(true);
+    // Initial load: get user details and local group ID
+    const initData = async () => {
       const uid = await AsyncStorage.getItem('pte_flow_user_id');
       setCurrentUserId(uid);
+
+      const currentScore = await scoreService.getScore();
+      setUserScore(currentScore);
 
       const resetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
       setIsResetActive(resetMode === 'true');
@@ -58,55 +60,54 @@ export default function Leaderboard() {
         await scoreService.setGroupId(uid);
       }
       setMyGroupId(groupId);
+    };
 
-      if (!groupId) {
-        setLoading(false);
-        return;
+    initData();
+  }, []);
+
+  // Listen to Firestore leaderboard based on myGroupId
+  useEffect(() => {
+    if (!myGroupId) return;
+
+    setLoading(true);
+    const q = query(
+      collection(db, 'leaderboard'),
+      where('groupId', '==', myGroupId)
+    );
+    
+    const unsubscribe = onSnapshot(q, async (snapshot: any) => {
+      const rawData = snapshot.docs.map((doc: any) => ({
+        userId: doc.id,
+        ...doc.data()
+      })) as Lead[];
+      
+      // Deduplicate by name, keeping highest score
+      const uniqueLeads: Record<string, Lead> = {};
+      rawData.forEach(lead => {
+        if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
+          uniqueLeads[lead.name] = lead;
+        }
+      });
+      
+      let sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
+      
+      // APPLY RESET FILTERS
+      const currentResetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
+      if (currentResetMode === 'true' && currentUserId) {
+        sortedLeads = sortedLeads.filter(l => l.userId === currentUserId);
       }
 
-      const q = query(
-        collection(db, 'leaderboard'),
-        where('groupId', '==', groupId)
-      );
-      
-      unsubscribe = onSnapshot(q, async (snapshot: any) => {
-        const rawData = snapshot.docs.map((doc: any) => ({
-          userId: doc.id,
-          ...doc.data()
-        })) as Lead[];
-        
-        // Deduplicate by name, keeping highest score
-        const uniqueLeads: Record<string, Lead> = {};
-        rawData.forEach(lead => {
-          if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
-            uniqueLeads[lead.name] = lead;
-          }
-        });
-        
-        let sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
-        
-        // APPLY RESET FILTERS
-        // If reset is active, user ONLY sees themselves (with 0 score which is already set in DB)
-        const currentResetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
-        if (currentResetMode === 'true' && uid) {
-          sortedLeads = sortedLeads.filter(l => l.userId === uid);
-        }
-
-        setLeads(sortedLeads);
-        setLoading(false);
-      }, (error: any) => {
-        // If index errors or network errors occur
-        handleFirestoreError(error, OperationType.LIST, 'leaderboard');
-        setLoading(false);
-      });
-    };
-
-    setupListener();
+      setLeads(sortedLeads);
+      setLoading(false);
+    }, (error: any) => {
+      handleFirestoreError(error, OperationType.LIST, 'leaderboard');
+      setLoading(false);
+    });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubscribe();
     };
-  }, []);
+  }, [myGroupId, currentUserId]);
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -247,26 +248,49 @@ export default function Leaderboard() {
     
     Alert.alert(
       "Leave Group",
-      "Are you sure you want to leave the group?",
+      "Are you sure you want to leave the group? Your points will be preserved in your private account, but you will no longer appear on the shared leaderboard.",
       [
-        { text: "No", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         { 
-          text: "Yes", 
+          text: "Leave Group", 
           style: "destructive",
           onPress: async () => {
             try {
               await ensureAuth();
-              await deleteDoc(doc(db, 'leaderboard', itemUserId));
               
-              // Local reset of group/score if desired so they don't immediately rejoin with points
-              await scoreService.setScore(0); 
-              await scoreService.setGroupId(itemUserId); // Back to private
+              // CRITICAL FIX: Update the user's document instead of deleting it
+              // This preserves all user data while simply reassigning them to their own private group
+              const userDocRef = doc(db, 'leaderboard', itemUserId);
+              await updateDoc(userDocRef, {
+                groupId: itemUserId, // Reassign to their own ID (private group)
+                lastUpdate: new Date().toISOString()
+                // DO NOT modify the score or any other user data
+              });
+              
+              // Update local state to reflect leaving the group
+              // Preserve the user's current score - DO NOT reset to 0
+              const currentScore = await scoreService.getScore();
+              console.log(`[LeaveGroup] Preserving score: ${currentScore}`);
+              
+              // Update local group ID to their own ID (private mode)
+              await scoreService.setGroupId(itemUserId);
               setMyGroupId(itemUserId);
+              
+              // Clear any reset flags that might be active
+              await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'false');
+              setIsResetActive(false);
 
-              Alert.alert("Left Group", "You have successfully removed your name from the Global Leaderboard.");
+              Alert.alert(
+                "Left Group", 
+                "You have left the shared leaderboard. Your points have been preserved and you are now in private mode. Scan a QR code to join another group."
+              );
+              
+              // The onSnapshot listener will automatically refresh the leaderboard
+              // showing only the user's own entry (since groupId is now their userId)
+              
             } catch (error) {
               console.error("Failed to leave group:", error);
-              Alert.alert("Error", "Could not remove your name.");
+              Alert.alert("Error", "Could not leave the group. Please try again.");
             }
           }
         }
@@ -275,7 +299,7 @@ export default function Leaderboard() {
   };
 
   const renderLead = ({ item, index }: { item: Lead, index: number }) => {
-    let bgColor = '#fff';
+    let bgColor = colors.surface;
     if (index === 0) bgColor = '#F0D089'; // Subtle Gold
     else if (index === 1) bgColor = '#CFCCCC'; // Subtle Silver
     else if (index === 2) bgColor = '#FAC38C'; // Subtle Bronze
@@ -307,7 +331,11 @@ export default function Leaderboard() {
 
     if (isSelf && item.userId) {
       return (
-        <TouchableOpacity onLongPress={() => handleLeaveGroup(item.userId!)} delayLongPress={800} activeOpacity={0.7}>
+        <TouchableOpacity 
+          onLongPress={() => handleLeaveGroup(item.userId!)} 
+          delayLongPress={800} 
+          activeOpacity={0.7}
+        >
           {Content}
         </TouchableOpacity>
       );
@@ -425,5 +453,3 @@ export default function Leaderboard() {
     </SafeAreaView>
   );
 }
-
-// Replaced by dynamic styles

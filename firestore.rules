@@ -70,7 +70,7 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                     existing().isUsed == false &&
                     incoming().isUsed == true && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt']) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt', 'deviceId']) &&
                     incoming().usedBy == request.auth.uid;
     }
 
@@ -89,6 +89,7 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create: if isSignedIn() && isValidResult(incoming());
         allow update: if isSignedIn() && isOwner(userId) && isValidResult(incoming());
+        allow delete: if isSignedIn();
       }
     }
   }

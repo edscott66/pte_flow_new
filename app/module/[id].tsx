@@ -42,7 +42,7 @@ import { networkService } from '../../services/networkService';
 import { Config } from '../../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const CATEGORIES: Record<string, { title: string, tasks: { id: string, title: string, icon: string }[] }> = {
   speaking: {
@@ -153,7 +153,6 @@ const LFibInput = React.memo(({ i, item, value, lFibResult, handleLFibChange, st
           marginHorizontal: 4, 
           height: 38,
           paddingVertical: 0,
-          backgroundColor: '#fff',
           fontSize: 16,
           borderBottomWidth: 2,
           borderBottomColor: '#2563EB'
@@ -483,7 +482,7 @@ export default function ModuleScreen() {
 
   // 2. ACTIVE TYPE DEFINITION (Fixes activeType error - ensures mistakes bank and mock exam items render correctly)
   const currentItem = questions[currentIndex] || {};
-  const activeType = currentItem.type || currentItem.moduleType || id;
+  const activeType = (id === 'essay') ? 'essay' : (currentItem.type || currentItem.moduleType || id);
   
   // --- IDENTIFY MODULES (Must use activeType, NOT id) ---
   const isReadAloud = activeType === 'read-aloud';
@@ -721,6 +720,7 @@ export default function ModuleScreen() {
   const flatListRef = useRef<FlatList>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeLeftRef = useRef<number>(0);
+  const totalTimeRef = useRef<number>(0);
   const autoNextTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingAudio = mode === 'PLAYING_AUDIO';
   
@@ -975,6 +975,7 @@ export default function ModuleScreen() {
   function startTimer(initialTime: number, onComplete: () => void) {
     stopTimer();
     timeLeftRef.current = initialTime;
+    totalTimeRef.current = initialTime;
     setTimeLeft(initialTime);
     
     timerRef.current = setInterval(() => {
@@ -1741,7 +1742,7 @@ export default function ModuleScreen() {
 
         {/* TASK INSTRUCTIONS (Mock Exam & Mistakes Bank - First of each set) */}
         {(id === 'mock-exam' || id === 'mistakes') && questions.findIndex(q => (q.type || q.moduleType) === (item.type || item.moduleType)) === index && mode === 'IDLE' && !hideInstruction && (
-          <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#2563EB', position: 'relative' }}>
+          <View style={{ backgroundColor: isDark ? colors.border : '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#2563EB', position: 'relative' }}>
             <TouchableOpacity 
               onPress={() => setHideInstruction(true)} 
               style={{ position: 'absolute', right: 8, top: 8, zIndex: 1 }}
@@ -1750,9 +1751,9 @@ export default function ModuleScreen() {
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <MaterialCommunityIcons name="information" size={18} color="#2563EB" />
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1E293B', marginLeft: 6 }}>INSTRUCTIONS:</Text>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginLeft: 6 }}>INSTRUCTIONS:</Text>
             </View>
-            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 20, paddingRight: 20 }}>
+            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20, paddingRight: 20 }}>
               {TASK_INSTRUCTIONS[item.type || item.moduleType] || 'Follow the instructions on screen to complete the task.'}
             </Text>
           </View>
@@ -1766,10 +1767,10 @@ export default function ModuleScreen() {
                   size={80} 
                   color={mode === 'RECORDING' ? '#EF4444' : '#2563EB'} 
                />
-               <Text style={{fontSize: 22, fontWeight: 'bold', marginTop: 15, color: '#1E293B'}}>
+               <Text style={{fontSize: 22, fontWeight: 'bold', marginTop: 15, color: colors.text}}>
                   Personal Introduction
                </Text>
-               <Text style={{fontSize: 16, textAlign: 'center', marginTop: 15, color: '#64748B', lineHeight: 24}}>
+               <Text style={{fontSize: 16, textAlign: 'center', marginTop: 15, color: colors.subtext, lineHeight: 24}}>
                   {item.prompt}
                </Text>
 
@@ -1777,9 +1778,9 @@ export default function ModuleScreen() {
                {(mode === 'PREP' || mode === 'RECORDING') && (
                  <View style={{marginTop: 40, alignItems: 'center'}}>
                    <Text style={{fontSize: 20, fontWeight: 'bold', color: mode === 'RECORDING' ? '#EF4444' : '#F59E0B'}}>
-                     {mode === 'PREP' ? 'Preparation Time' : 'Recording... Speak Now!'}
+                     {mode === 'PREP' ? 'Preparation Time' : 'Recording...'}
                    </Text>
-                   <Text style={{fontSize: 56, fontWeight: 'bold', color: '#1E293B', marginTop: 10}}>
+                   <Text style={{fontSize: 56, fontWeight: 'bold', color: colors.text, marginTop: 10}}>
                       00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
                    </Text>
                  </View>
@@ -1794,19 +1795,19 @@ export default function ModuleScreen() {
                   </View>
                 )}
                 <MaterialCommunityIcons name="comment-question-outline" size={80} color={mode === 'RECORDING' ? '#EF4444' : '#2563EB'} />
-                <Text style={{fontSize: 18, marginTop: 20, textAlign:'center', color: '#64748B'}}>
-                    {mode === 'PLAYING_AUDIO' ? "Listening..." : mode === 'RECORDING' ? "Speak Now!" : mode === 'PROCESSING' ? "Checking..." : mode === 'WAITING_NEXT' ? "Ready..." : "Press Start"}
+                <Text style={{fontSize: 18, marginTop: 20, textAlign:'center', color: colors.subtext}}>
+                    {mode === 'PLAYING_AUDIO' ? "Listening..." : mode === 'RECORDING' ? "Recording..." : mode === 'PROCESSING' ? "Checking..." : mode === 'WAITING_NEXT' ? "Ready..." : "Press Start"}
                 </Text>
             </View>
         )}
         {isReadAloud && ( 
           <View style={{flex: 1}}>
             {mode !== 'RESULT' && (
-              <View style={{backgroundColor: '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 15, alignSelf: 'center'}}>
-                  <Text style={{color:'#475569', fontWeight: 'bold'}}>
+              <View style={{backgroundColor: isDark ? colors.border : '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 15, alignSelf: 'center'}}>
+                  <Text style={{color:colors.subtext, fontWeight: 'bold'}}>
                     {mode === 'IDLE' ? 'Ready to Start' : 
                      mode === 'PREP' ? `Prepare to Read: ${timeLeft}s` :
-                     mode === 'RECORDING' ? 'Recording... Speak Now!' :
+                     mode === 'RECORDING' ? 'Recording...' :
                      mode === 'PROCESSING' ? 'Analyzing Speech...' : 'Result'}
                   </Text>
               </View>
@@ -1840,8 +1841,8 @@ export default function ModuleScreen() {
         {isDescribeImage && ( 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.imageContainer, { paddingBottom: 20 }]}>
             {mode !== 'RESULT' && (
-              <View style={{backgroundColor: '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 15}}>
-                  <Text style={{color:'#475569', fontWeight: 'bold'}}>
+              <View style={{backgroundColor: isDark ? colors.border : '#F1F5F9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 15}}>
+                  <Text style={{color:colors.subtext, fontWeight: 'bold'}}>
                     {mode === 'IDLE' ? 'Ready to Start' : 
                      mode === 'PREP' ? `Prepare to Describe: ${timeLeft}s` :
                      mode === 'RECORDING' ? `Recording: ${timeLeft}s` :
@@ -1914,7 +1915,7 @@ export default function ModuleScreen() {
                           ]}
                         >
                           <Text style={[
-                            { color: '#2563EB', fontWeight: 'bold' },
+                            { color: colors.primary, fontWeight: 'bold' },
                             blankAnswers[i] ? { color: '#fff' } : null,
                             fillBlankScore ? { color: '#fff' } : null
                           ]}>
@@ -1947,12 +1948,12 @@ export default function ModuleScreen() {
                           style={[
                             styles.inlineInput, 
                             { minWidth: 100, height: 40, marginVertical: 5 },
-                            activeRwBlankIndex === i && { borderColor: '#2563EB', borderWidth: 2, backgroundColor: '#DBEAFE' },
+                            activeRwBlankIndex === i && { borderColor: '#2563EB', borderWidth: 2, backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE' },
                             rwResult ? (rwAnswers[i]?.trim().toLowerCase() === item.correctAnswers[i].toLowerCase() ? styles.inputCorrect : styles.inputWrong) : null
                           ]} 
                           onPress={() => !rwResult && setActiveRwBlankIndex(i)}
                         >
-                          <Text style={{ fontSize: 16, color: rwAnswers[i] ? (rwResult ? '#fff' : '#1E293B') : '#94A3B8', fontWeight: rwAnswers[i] ? '600' : '400' }}>
+                          <Text style={{ fontSize: 16, color: rwAnswers[i] ? (rwResult ? '#fff' : colors.text) : colors.subtext, fontWeight: rwAnswers[i] ? '600' : '400' }}>
                             {rwResult && rwAnswers[i]?.trim().toLowerCase() !== item.correctAnswers[i].toLowerCase() ? `${rwAnswers[i] || '___'}` : (rwAnswers[i] || `(${i+1})`)}
                           </Text>
                         </TouchableOpacity>
@@ -1997,7 +1998,7 @@ export default function ModuleScreen() {
                  {item.displayText?.split(/\s+/).map((w:string, i:number) => {
                     const isSelected = selectedIndices.includes(i); 
                     let bgColor = 'transparent'; 
-                    let textColor = '#1E293B'; 
+                    let textColor = colors.text; 
                     
                     if (highlightResult && highlightResult.score === highlightResult.max) { 
                        if (highlightResult.correctIndices.includes(i)) {
@@ -2059,7 +2060,7 @@ export default function ModuleScreen() {
                 )}
 
                 {/* 3. SHOW THE QUESTION */}
-                {item.question && <Text style={{fontWeight:'bold', marginTop:10, fontSize: 16, color: '#1E293B'}}>{item.question}</Text>}
+                {item.question && <Text style={{fontWeight:'bold', marginTop:10, fontSize: 16, color: colors.text}}>{item.question}</Text>}
                 
                 <View style={{ marginTop: 20, gap: 10 }}>
                   {item.options?.map((opt: any) => {
@@ -2127,7 +2128,7 @@ export default function ModuleScreen() {
                   {mode === 'IDLE' ? 'Ready to Start' : 
                    mode === 'PLAYING_AUDIO' ? 'Listening to Lecture...' :
                    mode === 'PREP_RETELL' ? `Prepare to Retell: ${timeLeft}s` :
-                   mode === 'RECORDING' ? 'Recording... Speak Now!' :
+                   mode === 'RECORDING' ? 'Recording...' :
                    mode === 'PROCESSING' ? 'Analyzing Speech...' : 'Result'}
                 </Text>
               </View>
@@ -2217,16 +2218,16 @@ export default function ModuleScreen() {
 
                {/* 2. STATUS CARD */}
                {index === currentIndex && (
-                 <View style={{borderLeftWidth:5, borderLeftColor:'#14B8A6', backgroundColor:'#fff', padding:20, elevation:2, marginTop: 10, borderRadius: 4}}>
-                    <Text style={{textAlign:'center', fontWeight:'bold', color:'#64748B', textTransform:'uppercase', fontSize:12}}>Current Status</Text>
-                    <Text style={{textAlign:'center', fontSize:22, color:'#1E293B', fontWeight:'bold', marginVertical:10}}>
+                 <View style={{borderLeftWidth:5, borderLeftColor:'#14B8A6', backgroundColor: isDark ? colors.border : '#fff', padding:20, elevation:2, marginTop: 10, borderRadius: 4}}>
+                    <Text style={{textAlign:'center', fontWeight:'bold', color:colors.subtext, textTransform:'uppercase', fontSize:12}}>Current Status</Text>
+                    <Text style={{textAlign:'center', fontSize:22, color:colors.text, fontWeight:'bold', marginVertical:10}}>
                        {mode === 'IDLE' ? "Waiting to Start" :
                         mode === 'PLAYING_AUDIO' ? "Listening..." : 
                         mode === 'PREP' ? `Prepare to Speak: ${timeLeft}s` : 
-                        mode === 'RECORDING' ? "Recording... Speak Now!" : "Completed"}
+                        mode === 'RECORDING' ? "Recording..." : "Completed"}
                     </Text>
-                    <View style={{height:6, backgroundColor:'#E2E8F0', borderRadius:3, width:'100%', overflow:'hidden'}}>
-                        <View style={{height:'100%', width: mode==='PLAYING_AUDIO'?'50%':'100%', backgroundColor:'#14B8A6'}}/>
+                    <View style={{height:6, backgroundColor: isDark ? '#334155' : '#E2E8F0', borderRadius:3, width:'100%', overflow:'hidden'}}>
+                        <View style={{height:'100%', width: `${totalTimeRef.current > 0 ? (timeLeft / totalTimeRef.current) * 100 : 0}%`, backgroundColor:'#14B8A6'}}/>
                     </View>
                  </View>
                )}
@@ -2312,25 +2313,25 @@ export default function ModuleScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Exam Overview</Text>
-        <Text style={{ fontSize: 16, color: '#64748B', marginBottom: 20 }}>Complete all three parts of the PTE Academic exam in one sitting.</Text>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Exam Overview</Text>
+        <Text style={{ fontSize: 16, color: colors.subtext, marginBottom: 20 }}>Complete all three parts of the PTE Academic exam in one sitting.</Text>
         
         {MOCK_EXAM_SECTIONS_INFO.map((section, idx) => (
-          <View key={section.id} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+          <View key={section.id} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 20, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2563EB', marginBottom: 5 }}>{section.title}</Text>
-            <Text style={{ fontSize: 14, color: '#64748B', marginBottom: 10 }}>{section.questionCount} Questions</Text>
-            <View style={{ borderTopWidth: 1, borderColor: '#F1F5F9', paddingTop: 10 }}>
+            <Text style={{ fontSize: 14, color: colors.subtext, marginBottom: 10 }}>{section.questionCount} Questions</Text>
+            <View style={{ borderTopWidth: 1, borderColor: colors.border, paddingTop: 10 }}>
               {section.breakdown.map((item, i) => (
                 <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: '#475569' }}>{item.type}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1E293B' }}>{item.count}</Text>
+                  <Text style={{ fontSize: 13, color: colors.subtext }}>{item.type}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.text }}>{item.count}</Text>
                 </View>
               ))}
             </View>
           </View>
         ))}
       </ScrollView>
-      <View style={{ padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#E2E8F0' }}>
+      <View style={{ padding: 20, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: '#E2E8F0' }}>
         <TouchableOpacity style={styles.btnPrimary} onPress={startMockExam}>
           <Text style={styles.btnText}>Start Exam</Text>
         </TouchableOpacity>
@@ -2354,22 +2355,22 @@ export default function ModuleScreen() {
               size={80} 
               color="#2563EB" 
             />
-            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E293B', marginTop: 15 }}>{sectionInfo.title}</Text>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, marginTop: 15 }}>{sectionInfo.title}</Text>
           </View>
           
-          <View style={{ backgroundColor: '#EFF6FF', padding: 20, borderRadius: 16, marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, color: '#1E293B', lineHeight: 24 }}>{sectionInfo.description}</Text>
+          <View style={{ backgroundColor: isDark ? colors.border : '#EFF6FF', padding: 20, borderRadius: 16, marginBottom: 20 }}>
+            <Text style={{ fontSize: 16, color: colors.text, lineHeight: 24 }}>{sectionInfo.description}</Text>
           </View>
 
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 15 }}>Question Breakdown:</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 15 }}>Question Breakdown:</Text>
           {sectionInfo.breakdown.map((item, i) => (
-            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F5F9' }}>
-              <Text style={{ fontSize: 15, color: '#475569' }}>{item.type}</Text>
-              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1E293B' }}>{item.count}</Text>
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 15, color: colors.subtext }}>{item.type}</Text>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text }}>{item.count}</Text>
             </View>
           ))}
         </ScrollView>
-        <View style={{ padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#E2E8F0' }}>
+        <View style={{ padding: 20, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border }}>
           <TouchableOpacity style={styles.btnPrimary} onPress={startSection}>
             <Text style={styles.btnText}>Start {sectionInfo.title.split(': ')[1]}</Text>
           </TouchableOpacity>
@@ -2428,29 +2429,29 @@ export default function ModuleScreen() {
           </View>
         </View>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <View style={{ alignItems: 'center', marginBottom: 30, backgroundColor: '#fff', padding: 30, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 }}>
-            <Text style={{ fontSize: 18, color: '#64748B', fontWeight: 'bold' }}>ESTIMATED SCORE</Text>
+          <View style={{ alignItems: 'center', marginBottom: 30, backgroundColor: colors.surface, padding: 30, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 }}>
+            <Text style={{ fontSize: 18, color: colors.subtext, fontWeight: 'bold' }}>ESTIMATED SCORE</Text>
             <Text style={{ fontSize: 72, fontWeight: 'bold', color: overallScore >= 79 ? '#059669' : overallScore >= 65 ? '#2563EB' : overallScore >= 50 ? '#D97706' : '#DC2626' }}>{overallScore}</Text>
-            <Text style={{ fontSize: 18, color: '#64748B' }}>out of 90</Text>
+            <Text style={{ fontSize: 18, color: colors.subtext }}>out of 90</Text>
           </View>
 
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 15 }}>Section Breakdown</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 15 }}>Section Breakdown</Text>
           {sectionPerformances.map((section) => (
-            <View key={section.id} style={{ backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <View key={section.id} style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>{section.name}</Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{section.name}</Text>
                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: section.percent >= 70 ? '#059669' : section.percent >= 50 ? '#2563EB' : '#DC2626' }}>{section.percent}%</Text>
               </View>
               <View style={{ height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ height: '100%', width: `${section.percent}%`, backgroundColor: section.percent >= 70 ? '#059669' : section.percent >= 50 ? '#2563EB' : '#DC2626' }} />
               </View>
-              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>{section.correct.toFixed(2)} / {section.qCount} pts earned</Text>
+              <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 8 }}>{section.correct.toFixed(2)} / {section.qCount} pts earned</Text>
             </View>
           ))}
 
-          <View style={{ marginTop: 20, backgroundColor: '#F0F9FF', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Feedback & Analysis</Text>
-            <Text style={{ fontSize: 14, color: '#475569', lineHeight: 22 }}>
+          <View style={{ marginTop: 20, backgroundColor: isDark ? colors.border : '#F0F9FF', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Feedback & Analysis</Text>
+            <Text style={{ fontSize: 14, color: colors.subtext, lineHeight: 22 }}>
               Your performance on these {totalQuestions} questions indicates a {overallScore >= 79 ? 'Superior (C1+)' : overallScore >= 65 ? 'Proficient (B2)' : overallScore >= 50 ? 'Limited (B1)' : 'Developing (A2)'} command of the tested material according to PTE standards.
               {"\n\n"}
               {sortedByScore.length === 1 ? (
@@ -2512,14 +2513,14 @@ export default function ModuleScreen() {
           <View style={{ width: 28 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 20 }}>Select a Task Type:</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 20 }}>Select a Task Type:</Text>
           {category.tasks.map((task) => (
             <TouchableOpacity 
               key={task.id} 
               style={{ 
                 flexDirection: 'row', 
                 alignItems: 'center', 
-                backgroundColor: '#fff', 
+                backgroundColor: colors.surface, 
                 padding: 16, 
                 borderRadius: 16, 
                 marginBottom: 12,
@@ -2530,10 +2531,10 @@ export default function ModuleScreen() {
               }}
               onPress={() => router.push(`/module/${task.id}`)}
             >
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: isDark ? colors.border : '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
                 <MaterialCommunityIcons name={task.icon as any} size={24} color="#2563EB" />
               </View>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#1E293B' }}>{task.title}</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{task.title}</Text>
               <MaterialCommunityIcons name="chevron-right" size={24} color="#94A3B8" style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           ))}
@@ -2664,8 +2665,8 @@ export default function ModuleScreen() {
                       </View>
 
                       {result.wordAnalysis && result.wordAnalysis.length > 0 && (
-                        <View style={{backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0'}}>
-                            <Text style={{fontWeight: 'bold', color: '#334155', marginBottom: 5}}>Pronunciation Heatmap (Tap word to listen):</Text>
+                        <View style={{backgroundColor: isDark ? colors.border : '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: isDark ? colors.border : '#E2E8F0'}}>
+                            <Text style={{fontWeight: 'bold', color: colors.text, marginBottom: 5}}>Pronunciation Heatmap (Tap word to listen):</Text>
                             <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center'}}>
                                 {result.wordAnalysis.map((item: any, i: number) => {
                                     const isBad = item.health === 'bad';
@@ -2720,11 +2721,11 @@ export default function ModuleScreen() {
 
                       {result.sectionFeedback && Object.keys(result.sectionFeedback).length > 0 && (
                         <View style={{marginTop: 10, marginBottom: 20}}>
-                            <Text style={{fontWeight: 'bold', color: '#1E293B', marginBottom: 10, fontSize: 16}}>Detailed Section Feedback:</Text>
+                            <Text style={{fontWeight: 'bold', color: colors.text, marginBottom: 10, fontSize: 16}}>Detailed Section Feedback:</Text>
                             {Object.entries(result.sectionFeedback).map(([key, value]: any) => (
-                                <View key={key} style={{backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0'}}>
+                                <View key={key} style={{backgroundColor: isDark ? colors.border : '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: colors.border}}>
                                     <Text style={{fontWeight: 'bold', color: '#2563EB', textTransform: 'capitalize', marginBottom: 4}}>{key.replace(/([A-Z])/g, ' $1')}</Text>
-                                    <Text style={{color: '#475569', fontSize: 13, lineHeight: 18}}>{value}</Text>
+                                    <Text style={{color: colors.subtext, fontSize: 13, lineHeight: 18}}>{value}</Text>
                                 </View>
                             ))}
                         </View>
@@ -2734,6 +2735,15 @@ export default function ModuleScreen() {
                          <TouchableOpacity style={{marginTop: 20, alignSelf: 'center'}} onPress={() => setShowModelAnswer(true)}>
                             <Text style={{color: '#2563EB', fontWeight:'bold', textDecorationLine: 'underline'}}>View Top Scoring Answer</Text>
                          </TouchableOpacity>
+                      )}
+
+                      {result.pacingFeedback && (
+                         <View style={{ backgroundColor: isDark ? colors.border : '#F0F9FF', padding: 15, borderRadius: 12, marginTop: 20 }}>
+                            <Text style={{ fontWeight: 'bold', color: '#0369A1', marginBottom: 5 }}>Pacing & Delivery Tips:</Text>
+                            <Text style={{ color: colors.text, fontSize: 13, marginBottom: 3 }}>• <Text style={{fontWeight: 'bold'}}>Speed:</Text> {result.pacingFeedback.speed}</Text>
+                            <Text style={{ color: colors.text, fontSize: 13, marginBottom: 3 }}>• <Text style={{fontWeight: 'bold'}}>Pauses:</Text> {result.pacingFeedback.pauses}</Text>
+                            <Text style={{ color: colors.text, fontSize: 13 }}>• <Text style={{fontWeight: 'bold'}}>Clarity:</Text> {result.pacingFeedback.clarity}</Text>
+                         </View>
                       )}
                   </ScrollView>
                   <View style={{ width: '100%', padding: 8, borderTopWidth: 1, borderColor: result.overall < 50 ? '#FECACA' : '#D1FAE5', backgroundColor: result.overall < 50 ? '#FEF2F2' : '#ECFDF5', gap: 6 }}>
@@ -2793,9 +2803,9 @@ export default function ModuleScreen() {
 
                     {/* IF CORRECT: Show the explanation */}
                     {currentItem.explanation && mcResult.score === mcResult.max && (
-                      <View style={{ marginTop: 15, padding: 12, backgroundColor: '#FFFFFF', borderRadius: 8, width: '100%', borderLeftWidth: 5, borderLeftColor: '#10B981' }}>
-                        <Text style={{fontWeight: 'bold', color: '#1E293B', marginBottom: 4}}>Why is this correct?</Text>
-                        <Text style={{color: '#334155', lineHeight: 22}}>{currentItem.explanation}</Text>
+                      <View style={{ marginTop: 15, padding: 12, backgroundColor: isDark ? colors.border : '#FFFFFF', borderRadius: 8, width: '100%', borderLeftWidth: 5, borderLeftColor: '#10B981' }}>
+                        <Text style={{fontWeight: 'bold', color: colors.text, marginBottom: 4}}>Why is this correct?</Text>
+                        <Text style={{color: colors.text, lineHeight: 22}}>{currentItem.explanation}</Text>
                       </View>
                     )}
                   </ScrollView>
@@ -2914,8 +2924,8 @@ export default function ModuleScreen() {
 
                     {/* LISTENING FIB DETAILED FEEDBACK */}
                     {isFillBlanksListening && lFibResult && (
-                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
-                        <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Results & Feedback:</Text>
+                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
+                        <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Results & Feedback:</Text>
                         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 12}}>
                           {currentItem.segments.flatMap((segment: string, i: number) => {
                             const words = segment.replace(/\s+/g, ' ').trim().split(' ');
@@ -2940,7 +2950,7 @@ export default function ModuleScreen() {
                                   </Text>
                                 </View>
                                 {lFibAnswers[i]?.trim().toLowerCase() !== currentItem.correctAnswers[i]?.toLowerCase() && (
-                                  <Text style={{color: '#059669', fontSize: 12, fontWeight: 'bold', marginTop: 2}}>{currentItem.correctAnswers[i]}</Text>
+                                  <Text style={{opacity: 0, fontSize: 12, fontWeight: 'bold', marginTop: 2}}>{currentItem.correctAnswers[i]}</Text>
                                 )}
                               </View>
                             ) : null;
@@ -2953,24 +2963,28 @@ export default function ModuleScreen() {
 
                     {/* READING FIB DETAILED FEEDBACK */}
                     {isFillBlanks && fillBlankScore && (
-                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
-                        <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Results & Feedback:</Text>
+                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
+                        <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Results & Feedback:</Text>
                         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 12}}>
                           {currentItem.segments.map((segment: string, i: number) => (
-                            <Text key={`seg-${i}`} style={[styles.fibText, {fontSize: 14}]}>
-                              {segment}
+                            <View key={`seg-${i}`} style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap'}}>
+                              <Text style={[styles.fibText, {fontSize: 14}]}>{segment}</Text>
                               {i < currentItem.segments.length - 1 && (
-                                <Text 
-                                  style={[
-                                    styles.blankBox, 
-                                    { fontSize: 14, paddingHorizontal: 4, height: 24 },
-                                    blankAnswers[i] === currentItem.correctAnswers[i] ? styles.blankCorrect : styles.blankWrong
-                                  ]}
-                                >
-                                  {blankAnswers[i] || '___'}
-                                </Text>
+                                <View style={{alignItems: 'center', marginHorizontal: 4}}>
+                                  <View style={[
+                                      styles.blankBox, 
+                                      { paddingHorizontal: 8, height: 26, justifyContent: 'center', alignItems: 'center', marginVertical: 0 },
+                                      blankAnswers[i] === currentItem.correctAnswers[i] ? styles.blankCorrect : styles.blankWrong
+                                    ]}
+                                  >
+                                    <Text style={{ fontSize: 14, color: '#fff', fontWeight: 'bold' }}>{blankAnswers[i] || '___'}</Text>
+                                  </View>
+                                  {blankAnswers[i] !== currentItem.correctAnswers[i] && (
+                                    <Text style={{opacity: 0, fontSize: 12, fontWeight: 'bold', marginTop: 2}}>{currentItem.correctAnswers[i]}</Text>
+                                  )}
+                                </View>
                               )}
-                            </Text>
+                            </View>
                           ))}
                         </View>
                       </View>
@@ -2978,24 +2992,29 @@ export default function ModuleScreen() {
 
                     {/* READING & WRITING FIB DETAILED FEEDBACK */}
                     {isFillBlanksRW && rwResult && (
-                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
-                        <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Results & Feedback:</Text>
+                      <View style={{ width: '100%', marginTop: 10, padding: 10, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: isAnyIncorrect ? '#FECACA' : '#D1FAE5' }}>
+                        <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Results & Feedback:</Text>
                         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 12}}>
                           {currentItem.segments.map((segment: string, i: number) => (
-                            <Text key={`seg-${i}`} style={[styles.fibText, {fontSize: 14}]}>
-                              {segment}
+                            <View key={`seg-${i}`} style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap'}}>
+                              <Text style={[styles.fibText, {fontSize: 14}]}>{segment}</Text>
                               {i < currentItem.segments.length - 1 && (
-                                <View style={[
-                                  styles.inlineInput, 
-                                  { width: 'auto', minWidth: 60, paddingHorizontal: 8, height: 30, justifyContent: 'center' },
-                                  rwAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i].toLowerCase() ? styles.inputCorrect : styles.inputWrong
-                                ]}>
-                                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: rwAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i].toLowerCase() ? '#065F46' : '#991B1B' }}>
-                                    {rwAnswers[i] || '___'}
-                                  </Text>
+                                <View style={{alignItems: 'center', marginHorizontal: 4}}>
+                                  <View style={[
+                                    styles.inlineInput, 
+                                    { width: 'auto', minWidth: 60, paddingHorizontal: 8, height: 30, justifyContent: 'center' },
+                                    rwAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i].toLowerCase() ? styles.inputCorrect : styles.inputWrong
+                                  ]}>
+                                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: rwAnswers[i]?.trim().toLowerCase() === currentItem.correctAnswers[i].toLowerCase() ? '#065F46' : '#991B1B' }}>
+                                      {rwAnswers[i] || '___'}
+                                    </Text>
+                                  </View>
+                                  {rwAnswers[i]?.trim().toLowerCase() !== currentItem.correctAnswers[i].toLowerCase() && (
+                                    <Text style={{opacity: 0, fontSize: 12, fontWeight: 'bold', marginTop: 2}}>{currentItem.correctAnswers[i]}</Text>
+                                  )}
                                 </View>
                               )}
-                            </Text>
+                            </View>
                           ))}
                         </View>
                       </View>
@@ -3004,8 +3023,8 @@ export default function ModuleScreen() {
                     {/* RE-ORDER DETAILED FEEDBACK */}
                     {isReOrder && reOrderScore && reOrderScore.score === reOrderScore.max && (
                       <View style={{ width: '100%', marginTop: 10 }}>
-                          <View style={{ marginTop: 10, padding: 10, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#D1FAE5' }}>
-                              <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>Correct Order:</Text>
+                          <View style={{ marginTop: 10, padding: 10, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#D1FAE5' }}>
+                              <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>Correct Order:</Text>
                               {currentItem.sentences?.map((sentence: string, idx: number) => (
                                   <View key={idx} style={[styles.reOrderResultItem, { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' }]}>
                                       <Text style={{ color: '#065F46' }}>{idx + 1}. {sentence}</Text>
@@ -3120,11 +3139,20 @@ export default function ModuleScreen() {
             <MaterialCommunityIcons name="close-circle" size={40} color="#fff" />
           </TouchableOpacity>
           {currentZoomImage && (
-            <Image 
-              source={typeof currentZoomImage === 'string' ? { uri: currentZoomImage } : currentZoomImage} 
-              style={{ width: '95%', height: '80%' }} 
-              resizeMode="contain"
-            />
+            <ScrollView 
+              maximumZoomScale={5} 
+              minimumZoomScale={1} 
+              contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+              style={{ width: '100%', height: '100%' }}
+              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+            >
+              <Image 
+                source={typeof currentZoomImage === 'string' ? { uri: currentZoomImage } : currentZoomImage} 
+                style={{ width: width, height: height * 0.8 }} 
+                resizeMode="contain"
+              />
+            </ScrollView>
           )}
         </View>
       </Modal>
@@ -3145,19 +3173,19 @@ export default function ModuleScreen() {
             </View>
 
             <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 5 }}>Your Answer:</Text>
-              <Text style={{ color: '#475569', fontStyle: 'italic' }}>"{userSummary || "No speech detected"}"</Text>
+              <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 5 }}>Your Answer:</Text>
+              <Text style={{ color: colors.subtext, fontStyle: 'italic' }}>"{userSummary || "No speech detected"}"</Text>
             </View>
 
             {((result?.content ?? 0) >= 60) && (
               <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontWeight: 'bold', color: '#1E293B', marginBottom: 5 }}>Expected Answer:</Text>
+                <Text style={{ fontWeight: 'bold', color: colors.text, marginBottom: 5 }}>Expected Answer:</Text>
                 <Text style={{ color: '#059669', fontWeight: 'bold' }}>{questions[currentIndex]?.answer}</Text>
               </View>
             )}
 
-            <View style={{ marginBottom: 20, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' }}>
-              <Text style={{ color: '#64748B', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' }}>Session Progress</Text>
+            <View style={{ marginBottom: 20, padding: 10, backgroundColor: isDark ? colors.border : '#F8FAFC', borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.subtext, fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' }}>Session Progress</Text>
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2563EB' }}>
                 Total Correct: {currentSessionScore.toFixed(0)} / {questions.length}
               </Text>
@@ -3199,12 +3227,11 @@ export default function ModuleScreen() {
       {/* SPEAK NOW POPUP */}
       <Modal visible={showSpeakNow} transparent={true} animationType="fade">
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ backgroundColor: '#fff', padding: 40, borderRadius: 30, alignItems: 'center', elevation: 20, borderWidth: 4, borderColor: '#10B981' }}>
+          <View style={{ backgroundColor: colors.surface, padding: 40, borderRadius: 30, alignItems: 'center', elevation: 20, borderWidth: 4, borderColor: '#10B981' }}>
             <View style={{backgroundColor: '#10B981', padding: 20, borderRadius: 50, marginBottom: 20}}>
               <MaterialCommunityIcons name="microphone" size={60} color="#fff" />
             </View>
-            <Text style={{ color: '#10B981', fontSize: 36, fontWeight: '900', textAlign: 'center' }}>SPEAK NOW</Text>
-            <Text style={{ color: '#64748B', fontSize: 16, marginTop: 10, fontWeight: '600' }}>Get ready to speak...</Text>
+            <Text style={{ color: '#10B981', fontSize: 32, fontWeight: '900', textAlign: 'center' }}>Get Ready to Speak</Text>
           </View>
         </View>
       </Modal>
@@ -3217,8 +3244,8 @@ export default function ModuleScreen() {
               <Text style={styles.modalTitle}>Module Instructions</Text>
               <MaterialCommunityIcons name="help-circle-outline" size={24} color="#2563EB" />
             </View>
-            <View style={{ backgroundColor: '#F1F5F9', padding: 20, borderRadius: 16, marginBottom: 20 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 10 }}>
+            <View style={{ backgroundColor: isDark ? colors.border : '#F1F5F9', padding: 20, borderRadius: 16, marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 10 }}>
                 {id === 'mock-exam' ? 'Mock Exam' : moduleInfo?.title}
               </Text>
               <Text style={styles.modelText}>

@@ -24,7 +24,7 @@ export const REPEAT_SENTENCE_QUESTIONS = [
   { id: '23', text: "The conference will bring together experts from a wide range of academic disciplines.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/23.mp3'},
   { id: '24', text: "Please ensure that all electronic devices are switched off during the presentation.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/24.mp3'},
   { id: '25', text: "The study found a strong correlation between sleep quality and academic performance.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/25.mp3'},
-  { id: '26', text: "Several factors must be considered when evaluating the effectiveness of the program.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/25.mp3'},
+  { id: '26', text: "Several factors must be considered when evaluating the effectiveness of the program.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/26.mp3'},
   { id: '27', text: "The university is planning to expand its research facilities over the next few years.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/27.mp3'},
   { id: '28', text: "The professor emphasized the importance of referencing all sources accurately.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/28.mp3'},
   { id: '29', text: "Many students find it helpful to form study groups before major examinations.", audioUrl: 'https://storage.googleapis.com/pte_flow_audio/speaking/repeat_sentence/29.mp3'},

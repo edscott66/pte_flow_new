@@ -478,7 +478,7 @@ options: [
 { id: 'C', text: "It stops people from using bottles." },
 { id: 'D', text: "It saves energy and reduces waste." }
 ],
-correctOption: 'B'
+correctOption: 'D'
 },
 {
 id: '35',
@@ -492,7 +492,7 @@ options: [
 { id: 'C', text: "They offer free access to learning resources." },
 { id: 'D', text: "They replace all schools." }
 ],
-correctOption: 'D'
+correctOption: 'C'
 },
 {
 id: '36',
@@ -548,7 +548,7 @@ options: [
 { id: 'C', text: "To remove rain from the forecast." },
 { id: 'D', text: "To avoid checking the temperature." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
 {
 id: '40',
@@ -562,7 +562,7 @@ options: [
 { id: 'C', text: "By buying more electronics." },
 { id: 'D', text: "By using only old appliances." }
 ],
-correctOption: 'D'
+correctOption: 'B'
 },
 {
 id: '41',
@@ -576,7 +576,7 @@ options: [
 { id: 'C', text: "It closes local businesses." },
 { id: 'D', text: "It prevents people from exploring." }
 ],
-correctOption: 'B'
+correctOption: 'A'
 },
 {
 id: '42',
@@ -604,7 +604,7 @@ options: [
 { id: 'C', text: "It makes paper heavier." },
 { id: 'D', text: "It stops people from reading." }
 ],
-correctOption: 'D'
+correctOption: 'B'
 },
 {
 id: '44',
@@ -618,7 +618,7 @@ options: [
 { id: 'C', text: "They make communication impossible." },
 { id: 'D', text: "They remove the need for teamwork." }
 ],
-correctOption: 'C'
+correctOption: 'B'
 },
 {
 id: '45',
@@ -627,12 +627,12 @@ audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choi
 text: "Preparing a healthy lunch at home allows people to choose fresh ingredients and avoid unhealthy fast food. It can also save money.",
 question: "Why do people prepare lunch at home?",
 options: [
-{ id: 'A', text: "To choose fresh ingredients." },
+{ id: 'A', text: "To avoid eating vegetables." },
 { id: 'B', text: "To eat more fast food." },
 { id: 'C', text: "To spend more money." },
-{ id: 'D', text: "To avoid eating vegetables." }
+{ id: 'D', text: "To choose fresh ingredients." }   
 ],
-correctOption: 'B'
+correctOption: 'D'
 },
 {
 id: '46',
@@ -646,7 +646,7 @@ options: [
 { id: 'C', text: "To reduce social contact." },
 { id: 'D', text: "To stop families from attending." }
 ],
-correctOption: 'D'
+correctOption: 'B'
 },
 {
 id: '47',
@@ -674,7 +674,7 @@ options: [
 { id: 'C', text: "To stop meeting new people." },
 { id: 'D', text: "To reduce fitness levels." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
 {
 id: '49',
@@ -683,10 +683,10 @@ audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choi
 text: "Many people choose water or herbal tea instead of sugary drinks. These healthier options help maintain good hydration without extra calories.",
 question: "Why do people choose water instead of sugary drinks?",
 options: [
-{ id: 'A', text: "It has no extra calories." },
+{ id: 'A', text: "It contains artificial flavours." },
 { id: 'B', text: "It tastes like sugar." },
 { id: 'C', text: "It increases thirst." },
-{ id: 'D', text: "It contains artificial flavours." }
+{ id: 'D', text: "It has no extra calories." }  
 ],
 correctOption: 'D'
 },
@@ -702,7 +702,7 @@ options: [
 { id: 'C', text: "They increase travel distances." },
 { id: 'D', text: "They remove daily items." }
 ],
-correctOption: 'B'
+correctOption: 'A'
 },
 {
 id: '51',
@@ -716,7 +716,7 @@ options: [
 { id: 'C', text: "It reduces language skills." },
 { id: 'D', text: "It limits travel opportunities." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
 {
 id: '52',
@@ -744,7 +744,7 @@ options: [
 { id: 'C', text: "They are always expensive." },
 { id: 'D', text: "They remove all learning materials." }
 ],
-correctOption: 'D'
+correctOption: 'B'
 },
 {
 id: '54',
@@ -758,7 +758,7 @@ options: [
 { id: 'C', text: "To add more unhealthy additives." },
 { id: 'D', text: "To stop eating vegetables." }
 ],
-correctOption: 'B'
+correctOption: 'A'
 },
 {
 id: '55',
@@ -772,7 +772,7 @@ options: [
 { id: 'C', text: "To remove emergency services." },
 { id: 'D', text: "To increase accidents." }
 ],
-correctOption: 'C'
+correctOption: 'B'
 },
 {
 id: '56',
@@ -800,7 +800,7 @@ options: [
 { id: 'C', text: "To reduce community support." },
 { id: 'D', text: "To stop helping others." }
 ],
-correctOption: 'D'
+correctOption: 'A'
 },
 {
 id: '58',
@@ -814,7 +814,7 @@ options: [
 { id: 'C', text: "They make people hungrier." },
 { id: 'D', text: "They reduce nutrition." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
 {
 id: '59',
@@ -844,20 +844,21 @@ options: [
 ],
 correctOption: 'D'
 },
-{
-id: '61',
-title: 'Healthy Breakfast',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/61.mp3',
-text: "Eating a healthy breakfast gives the body energy for the day. Many people choose fruit, yogurt, or whole grains to start their morning well.",
-question: "Why is breakfast important?",
-options: [
-{ id: 'A', text: "It makes people feel tired." },
-{ id: 'B', text: "It removes the need for lunch." },
-{ id: 'C', text: "It reduces energy levels." },
-{ id: 'D', text: "It provides energy for the day." }
-],
-correctOption: 'D'
-},
+  {
+    id: '61',
+    title: 'Weekend Plans',
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/61.mp3',
+    text: "Hi, my name is Emma and I want to tell you about my plans for this weekend. On Saturday morning, I am going to the local market with my friend Sarah. We love buying fresh vegetables and homemade bread there. In the afternoon, we will watch a new film at the cinema. I am really excited because the film has great reviews. On Sunday, my family is visiting from Manchester. My mother is bringing her famous chocolate cake. We will all have lunch together and then go for a walk in the park if the weather is nice. It will be a busy but very happy weekend.",
+    question: "What will Emma do on Saturday afternoon?",
+    options: [
+      { id: 'A', text: "Watch a film at the cinema." },
+      { id: 'B', text: "Visit the local market." },
+      { id: 'C', text: "Have lunch with her family." },
+      { id: 'D', text: "Bake a chocolate cake." }
+    ],
+    correctOption: 'A'
+  },
+
 {
 id: '62',
 title: 'Public Transport',
@@ -940,7 +941,7 @@ options: [
 { id: 'C', text: "It removes the need for sleep." },
 { id: 'D', text: "It reduces energy levels." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
 {
 id: '68',
@@ -954,36 +955,37 @@ options: [
 { id: 'C', text: "By posting private details." },
 { id: 'D', text: "By using strong passwords." }
 ],
-correctOption: 'A'
-},
-{
-id: '69',
-title: 'Healthy Snacks',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/69.mp3',
-text: "Healthy snacks like fruit and nuts provide energy without too much sugar. They help people stay full between meals.",
-question: "Why do people choose healthy snacks?",
-options: [
-{ id: 'A', text: "They contain more sugar." },
-{ id: 'B', text: "They reduce nutrition." },
-{ id: 'C', text: "They provide energy without too much sugar." },
-{ id: 'D', text: "They make people hungrier." }
-],
 correctOption: 'D'
 },
+  {
+    id: '69',
+    title: "A Gift for a Friend",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/69.mp3',
+    text: "Mark needs to buy a birthday present for his best friend James. James loves music, but he already has many CDs and a good pair of headphones. Mark wants to give him something special. He thinks about a book, but James does not read very much. Then Mark remembers that James enjoys cooking. So he goes to a kitchen shop and finds a beautiful blue apron with James’s name on it. He also buys a small book of Italian recipes because James loves Italian food. The total cost is thirty-five pounds. Mark is sure James will love the presents.",
+    question: "What does Mark finally decide to buy for James?",
+    options: [
+      { id: 'A', text: "A pair of headphones." },
+     { id: 'B', text: "A book about music." },
+      { id: 'C', text: "A collection of CDs." },
+      {id: 'D', text: "An apron and a recipe book." }
+    ],
+    correctOption: 'D'
+  },
 {
-id: '70',
-title: 'Studying Abroad',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/70.mp3',
-text: "Studying abroad allows students to experience new cultures and improve language skills. It also helps them become more independent.",
-question: "What is one benefit of studying abroad?",
-options: [
-{ id: 'A', text: "It reduces independence." },
-{ id: 'B', text: "It prevents cultural learning." },
-{ id: 'C', text: "It improves language skills." },
-{ id: 'D', text: "It limits travel opportunities." }
-],
-correctOption: 'C'
-},
+    id: '70',
+    title: "A Library Visit",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/70.mp3',
+    text: "Hello, my name is Paul and I work at the Central Library. We have many services for our members. You can borrow up to six books for three weeks. If you finish them early, you can return them in the drop box outside at any time. We also have a great collection of DVDs and audiobooks. In addition, every Thursday afternoon we have a reading club for children. It is free and very popular. This month, we are organising a writing competition for teenagers. The first prize is a tablet computer. For more information, please visit our website or ask me at the front desk.",
+    question: "What special event is happening this month at the library?",
+    options: [
+      { id: 'A', text: "A book sale." },
+      { id: 'B', text: "A film evening." },
+      { id: 'C', text: "A reading club for adults." },
+      { id: 'D', text: "A writing competition for teenagers." }
+    ],
+    correctOption: 'D'
+  },
+
 {
 id: '71',
 title: 'Healthy Cooking',
@@ -996,36 +998,36 @@ options: [
 { id: 'C', text: "To add unhealthy additives." },
 { id: 'D', text: "To spend more money." }
 ],
-correctOption: 'B'
-},
-{
-id: '72',
-title: 'Online Meetings',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/72.mp3',
-text: "Online meetings allow people to work together from different locations. They save time and make communication easier for remote teams.",
-question: "Why are online meetings helpful?",
-options: [
-{ id: 'A', text: "They require travel." },
-{ id: 'B', text: "They help remote teams communicate." },
-{ id: 'C', text: "They make teamwork impossible." },
-{ id: 'D', text: "They remove all planning." }
-],
 correctOption: 'A'
 },
+  {
+    id: '72',
+    title: "An Unusual Pet",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/72.mp3',
+    text: "My friend Anna has an unusual pet. She does not have a cat or a dog. She has a parrot called Rio. Rio is an African grey parrot and he is four years old. He can say several phrases like 'Hello, how are you?' and 'Time for tea!' He also copies the sound of Anna's phone and the doorbell, which sometimes confuses visitors. Anna feeds Rio fresh fruit and special parrot food. She also lets him fly around the living room every evening for exercise. Rio loves sitting on Anna's shoulder while she watches TV. He is a very clever and funny companion.",
+    question: "What can Rio the parrot do?",
+    options: [
+      { id: 'A', text: "Sing whole songs." },
+      { id: 'B', text: "Imitate human speech and sounds." },
+      { id: 'C', text: "Open his cage by himself." },
+      { id: 'D', text: "Swim in the bathroom." }
+    ],
+    correctOption: 'B'
+  },
 {
-id: '73',
-title: 'Reading for Relaxation',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/73.mp3',
-text: "Reading is a popular way to relax after a long day. Many people enjoy books because they offer a quiet escape from stress.",
-question: "Why do people read to relax?",
-options: [
-{ id: 'A', text: "It increases stress." },
-{ id: 'B', text: "It provides a quiet escape." },
-{ id: 'C', text: "It makes focusing harder." },
-{ id: 'D', text: "It replaces the need for sleep." }
-],
-correctOption: 'C'
-},
+    id: '73',
+    title: 'A Healthy Change',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/73.mp3',
+    text: "Six months ago, Kevin was not very healthy. He ate too many sweets and did not exercise much. He felt tired all the time. His doctor told him to change his lifestyle. So Kevin joined a local fitness club. He now goes there three times a week after work. He also changed his diet. He eats more vegetables and fruit, and only drinks water or tea instead of sugary drinks. He has lost ten kilograms and feels much better. He also sleeps better at night. Kevin says the secret is not a diet, but a new way of living. He is very proud of himself.",
+    question: "What was the doctor's advice to Kevin?",
+    options: [
+      { id: 'A', text: "To take medicine every day." },
+      { id: 'B', text: "To change his lifestyle." },
+      { id: 'C', text: "To stop working so hard." },
+      { id: 'D', text: "To go on a special diet." }
+    ],
+    correctOption: 'B'
+  },
 {
 id: '74',
 title: 'Travel Safety',
@@ -1033,27 +1035,27 @@ audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choi
 text: "When travelling, it is important to keep personal belongings safe. Many travellers use locks or hidden pockets to protect valuables.",
 question: "How can travellers protect their belongings?",
 options: [
-{ id: 'A', text: "By leaving items unattended." },
-{ id: 'B', text: "By using locks or hidden pockets." },
+{ id: 'A', text: "By using locks or hidden pockets." },   
+{ id: 'B', text: "By leaving items unattended." },
 { id: 'C', text: "By carrying everything in one hand." },
 { id: 'D', text: "By ignoring surroundings." }
 ],
-correctOption: 'D'
+correctOption: 'A'
 },
-{
-id: '75',
-title: 'Fitness Apps',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/75.mp3',
-text: "Fitness apps help people track their steps, workouts, and sleep. They motivate users to stay active and reach their goals.",
-question: "Why do people use fitness apps?",
-options: [
-{ id: 'A', text: "To avoid exercise." },
-{ id: 'B', text: "To track their progress." },
-{ id: 'C', text: "To reduce motivation." },
-{ id: 'D', text: "To stop setting goals." }
-],
-correctOption: 'B'
-},
+  {
+    id: '75',
+    title: 'A New Job',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/75.mp3',
+    text: "Congratulations to me! I have just got a new job. I will be working at a hotel near the airport. My position is receptionist. I will welcome guests, answer the phone and help with bookings. The hotel has thirty rooms and a small restaurant. The manager, Mrs. Hill, seems very kind. I will work five days a week, from two in the afternoon until ten in the evening. It means I can have free mornings for my hobbies like swimming and painting. I start next Monday and I am a little nervous but mostly excited to meet my new colleagues.",
+    question: "What will her main work hours be?",
+    options: [
+      { id: 'A', text: "Morning until lunchtime." },
+      { id: 'B', text: "Nine to five." },
+      { id: 'C', text: "Two in the afternoon until ten in the evening." },
+      { id: 'D', text: "Only weekends." }
+    ],
+    correctOption: 'C'
+  },
 {
 id: '76',
 title: 'Healthy Hydration',
@@ -1066,7 +1068,7 @@ options: [
 { id: 'C', text: "It helps the body function well." },
 { id: 'D', text: "It stops digestion." }
 ],
-correctOption: 'A'
+correctOption: 'C'
 },
 {
 id: '77',
@@ -1077,8 +1079,8 @@ question: "What is one advantage of local tourism?",
 options: [
 { id: 'A', text: "It requires long flights." },
 { id: 'B', text: "It increases travel costs." },
-{ id: 'C', text: "It supports small businesses." },
-{ id: 'D', text: "It closes local attractions." }
+{ id: 'C', text: "It closes local attractions." },
+{ id: 'D', text: "It supports small businesses." }   
 ],
 correctOption: 'D'
 },
@@ -1096,20 +1098,20 @@ options: [
 ],
 correctOption: 'C'
 },
-{
-id: '79',
-title: 'Cooking at Home',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/79.mp3',
-text: "Cooking meals at home allows people to control ingredients and avoid unhealthy additives. It is also a great way to save money.",
-question: "Why do people cook at home?",
-options: [
-{ id: 'A', text: "To control ingredients." },
-{ id: 'B', text: "To avoid vegetables." },
-{ id: 'C', text: "To add unhealthy additives." },
-{ id: 'D', text: "To spend more money." }
-],
-correctOption: 'A'
-},
+  {
+    id: '79',
+    title: "A Day at the Beach",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/79.mp3',
+    text: "Last Sunday, my family and I went to Brighton beach. The weather was fantastic, sunny and warm. We left home at nine in the morning and arrived by half past ten. My children immediately ran to the water. They built a big sandcastle with towers and a bridge. I sat on a blanket and read a magazine while my husband went to buy fish and chips. In the afternoon, we walked along the pier and the children had ice cream. We took many photos. We came home feeling tired but very happy. It was a perfect family day out.",
+    question: "What did the children build on the beach?",
+    options: [
+      { id: 'A', text: "A large sandcastle." },
+      { id: 'B', text: "A boat from wood." },
+      { id: 'C', text: "A garden for shells." },
+      { id: 'D', text: "A wall of stones." }
+    ],
+    correctOption: 'A'
+  },
 {
 id: '80',
 title: 'Healthy Lifestyle',
@@ -1118,8 +1120,8 @@ text: "A healthy lifestyle includes regular exercise, balanced meals, and enough
 question: "What is one part of a healthy lifestyle?",
 options: [
 { id: 'A', text: "Skipping breakfast daily." },
-{ id: 'B', text: "Sleeping only two hours." },
-{ id: 'C', text: "Eating balanced meals." },
+{ id: 'B', text: "Eating balanced meals." },  
+{ id: 'C', text: "Sleeping only two hours." },
 { id: 'D', text: "Avoiding all exercise." }
 ],
 correctOption: 'B'
@@ -1129,143 +1131,143 @@ correctOption: 'B'
 //B1+ Level (Items 81-150)
 {
 id: '81',
-title: 'Cognitive Biases in Decision-Making',
+title: 'City Transport',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/81.mp3',
-text: "Human decision-making is frequently influenced by systematic cognitive biases, which are mental shortcuts that can lead to irrational conclusions. Confirmation bias, for instance, is the tendency to favour information that confirms pre-existing beliefs while disregarding contradictory evidence. The sunk cost fallacy compels individuals to continue an endeavour based on previously invested resources, not future prospects. Understanding these biases is crucial in fields from business to medicine, as they can impair judgment. Mitigation strategies include seeking diverse perspectives, implementing structured decision-making processes, and fostering a culture of constructive criticism.",
-question: "What does the sunk cost fallacy specifically cause people to do?",
+text: "Many cities are improving public transport to reduce traffic and pollution. Buses and trains are becoming faster and more reliable.",
+question: "Why are cities improving public transport?",
 options: [
-{ id: 'A', text: "Make decisions based purely on future benefits." },
-{ id: 'B', text: "Ignore all information that supports their goals." },
-{ id: 'C', text: "Continue a project due to past investments, not future value." },
-{ id: 'D', text: "Always choose the option with the lowest initial cost." }
+{ id: 'A', text: "To reduce traffic and pollution." },
+{ id: 'B', text: "To make travel more expensive." },
+{ id: 'C', text: "To remove all cars." },
+{ id: 'D', text: "To increase noise levels." }
 ],
-correctOption: 'C'
+correctOption: 'A'
 },
-{
-id: '82',
-title: 'The Anthropocene Epoch',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/82.mp3',
-text: "Geologists are debating whether to officially designate a new geological epoch: the Anthropocene. This term signifies an age where human activity is the dominant influence on Earth's climate and ecosystems. Evidence includes plastic pollution in sediment layers, radioactive elements from nuclear tests, and a dramatic increase in greenhouse gases. Proponents argue it formally recognises the scale of human impact. Critics contend that while human influence is undeniable, it may not yet meet the strict, millenia-long criteria used to define geological time units. The debate itself underscores the profound and lasting mark of humanity on the planet.",
-question: "What is the core concept of the proposed Anthropocene epoch?",
-options: [
-{ id: 'A', text: "A period defined by natural climate cycles without human interference." },
-{ id: 'B', text: "The epoch that immediately preceded the rise of human civilizations." },
-{ id: 'C', text: "A time of decreased technological advancement and environmental impact." },
-{ id: 'D', text: "Human activity as the primary force shaping Earth's geology and ecology." }  
-],
-correctOption: 'D'
-},
+  {
+    id: '82',
+    title: "A Holiday in Wales",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/82.mp3',
+    text: "Last summer, my family and I went on holiday to Wales. We stayed in a small cottage near Snowdonia National Park. The countryside was amazing, with green hills, rivers and lots of sheep. We went walking every day. One day, we climbed Mount Snowdon. It took us about five hours to reach the top, and the view was incredible. We could see the sea on one side and mountains on the other. My children were tired but very proud. We also visited some old castles and ate traditional Welsh cakes. It was one of the best holidays we have ever had.",
+    question: "What did they do on one special day during the holiday?",
+    options: [
+      { id: 'A', text: "Visited a castle." },
+      { id: 'B', text: "Went swimming in the sea." },
+      { id: 'C', text: "Climbed Mount Snowdon." },
+      { id: 'D', text: "Took a boat trip." }
+    ],
+    correctOption: 'C'
+  },
 {
 id: '83',
-title: 'The Paradox of Choice',
+title: 'Healthy Eating',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/83.mp3',
-text: "Psychologist Barry Schwartz's 'paradox of choice' theory posits that while autonomy is vital, an overabundance of options can lead to anxiety, decision paralysis, and decreased satisfaction. Faced with 50 types of jam, consumers are less likely to purchase any than when offered 6. The effort of comparing numerous alternatives increases the opportunity cost of any single choice, fostering regret over 'what might have been.' This has implications for marketing, public policy, and wellbeing. The solution is not to remove choice, but to curate meaningful options and cultivate the ability to be content with 'good enough' decisions.",
-question: "According to the paradox of choice, what is a likely outcome of too many options?",
+text: "Eating fruits and vegetables every day helps the body stay strong. These foods provide vitamins that support good health.",
+question: "Why should people eat fruits and vegetables?",
 options: [
-{ id: 'A', text: "Increased consumer confidence and faster decision-making." },
-{ id: 'B', text: "Greater satisfaction with the final selected option." },
-{ id: 'C', text: "Decision paralysis and reduced likelihood of making any choice." },
-{ id: 'D', text: "A guaranteed improvement in the quality of all available products." }
+{ id: 'A', text: "They are always expensive." },
+{ id: 'B', text: "They provide vitamins." },
+{ id: 'C', text: "They replace exercise." },
+{ id: 'D', text: "They reduce sleep." }
 ],
-correctOption: 'C'
+correctOption: 'B'
 },
 {
 id: '84',
-title: 'Quantum Computing Fundamentals',
+title: 'Work-Life Balance',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/84.mp3',
-text: "Quantum computing represents a paradigm shift from classical computing. While classical bits are either 0 or 1, quantum bits, or 'qubits,' can exist in a superposition of both states simultaneously. This, along with 'entanglement,' allows quantum computers to perform certain calculations exponentially faster. Potential applications include simulating complex molecules for drug discovery and optimizing large-scale logistical systems. However, building stable, error-corrected quantum computers remains a formidable engineering challenge due to the fragile nature of quantum states. The field is in its infancy but holds transformative potential for specific, high-complexity problems.",
-question: "What fundamental property allows a qubit to differ from a classical bit?",
+text: "Maintaining a work-life balance is important for mental health. People should take breaks and spend time with family and friends.",
+question: "What helps maintain good mental health?",
 options: [
-{ id: 'A', text: "It is physically much larger and more durable." },     
-{ id: 'B', text: "It can only represent a definitive 0 or 1 at any time." },
-{ id: 'C', text: "It can be in a state of superposition (both 0 and 1)." },
-{ id: 'D', text: "It processes information more slowly for security reasons." }
+{ id: 'A', text: "Taking breaks and relaxing." },
+{ id: 'B', text: "Working all day without rest." },
+{ id: 'C', text: "Avoiding friends." },
+{ id: 'D', text: "Sleeping less." }
 ],
 correctOption: 'A'
 },
 {
 id: '85',
-title: 'Postmodernism in Art and Literature',
+title: 'Saving Money',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/85.mp3',
-text: "Postmodernism, emerging in the mid-20th century, is characterised by scepticism towards grand narratives and ideologies. In contrast to modernism's pursuit of universal truth and progress, postmodern works embrace fragmentation, paradox, and self-referentiality. They often employ techniques like pastiche, parody, and intertextuality, blurring the lines between high and low culture. The movement questions notions of originality and authority, suggesting meaning is constructed by the viewer or reader. While criticized for relativism and cynicism, its influence is pervasive, challenging established structures in architecture, literature, and critical theory.",
-question: "How does postmodernism typically view 'grand narratives'?",
+text: "Saving money regularly can help people prepare for emergencies. Even small amounts saved each month can make a difference over time.",
+question: "Why is saving money important?",
 options: [
-{ id: 'A', text: "It wholeheartedly embraces them as the ultimate source of truth." },
-{ id: 'B', text: "It views them with scepticism and seeks to deconstruct them." },
-{ id: 'C', text: "It believes they are only found in scientific texts, not art." },
-{ id: 'D', text: "It considers them the sole valid purpose for creating art." }
+{ id: 'A', text: "It increases daily spending." },
+{ id: 'B', text: "It avoids all work." },
+{ id: 'C', text: "It makes people richer instantly." },
+{ id: 'D', text: "It helps prepare for emergencies." }
 ],
-correctOption: 'B'
+correctOption: 'D'
 },
 {
 id: '86',
-title: 'The Precariat: A New Social Class',
+title: 'Reading Habit',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/86.mp3',
-text: "Sociologist Guy Standing identifies the 'precariat' as an emerging class defined by precarious living conditions, lacking job security, benefits, or a occupational narrative. This group includes gig workers, temporary contractors, and those in unstable service jobs. Unlike the traditional proletariat, their grievance is not just exploitation but also a lack of identity and control over time. The precariat faces social and economic uncertainty, which can fuel political alienation. Standing argues for a 'commons-based' social model and a universal basic income to provide stability, suggesting this class is a central political issue of the 21st century.",
-question: "What distinguishes the precariat from the traditional working class, according to the text?",
+text: "Reading books regularly can improve vocabulary and knowledge. It also helps people relax and focus better.",
+question: "What is one benefit of reading books?",
 options: [
-{ id: 'A', text: "They enjoy greater job security and comprehensive benefits." },
-{ id: 'B', text: "Their main issue is a lack of occupational identity and control, not just low pay." },
-{ id: 'C', text: "They are defined by owning significant capital and property." },
-{ id: 'D', text: "They are completely immune to economic fluctuations." }
+{ id: 'A', text: "It reduces knowledge." },
+{ id: 'B', text: "It improves vocabulary." },
+{ id: 'C', text: "It wastes time." },
+{ id: 'D', text: "It increases stress." }
 ],
 correctOption: 'B'
 },
 {
 id: '87',
-title: 'The Drake Equation',
+title: 'Exercise Routine',
 audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/87.mp3',
-text: "The Drake Equation is a probabilistic argument used to estimate the number of active, communicative extraterrestrial civilizations in our galaxy. It multiplies factors like the rate of star formation, the fraction of stars with planets, and the probability of life developing intelligence and technology. While several factors are now constrained by astronomy (many stars have planets), key variables like the longevity of communicative civilizations remain pure speculation. The equation does not provide an answer but structures the scientific inquiry into extraterrestrial life. It highlights that the question is not whether other life exists, but whether it is detectable within our limited timeframe and technological window.",
-question: "What is the primary purpose of the Drake Equation?",
+text: "Regular exercise keeps the body fit and reduces the risk of illness. Activities like walking, cycling, and swimming are very helpful.",
+question: "What is one benefit of regular exercise?",
 options: [
-{ id: 'A', text: "To definitively prove that no other intelligent life exists." },
-{ id: 'B', text: "To calculate the exact distance to the nearest alien civilization." },
-{ id: 'C', text: "To provide a structured framework for estimating the possibility of such civilizations." },
-{ id: 'D', text: "To describe the chemical process by which life first formed on Earth." }
+{ id: 'A', text: "It keeps the body fit." },
+{ id: 'B', text: "It causes illness." },
+{ id: 'C', text: "It reduces energy." },
+{ id: 'D', text: "It increases stress." }
+],
+correctOption: 'A'
+},
+{
+id: '88',
+title: 'Travel Experience',
+audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/88.mp3',
+text: "Traveling to new places allows people to learn about different cultures. It can also help them understand other ways of life.",
+question: "What can people learn from traveling?",
+options: [
+{ id: 'A', text: "Only their own culture." },
+{ id: 'B', text: "Nothing new." },
+{ id: 'C', text: "Different cultures." },
+{ id: 'D', text: "Only languages." }
 ],
 correctOption: 'C'
 },
 {
-id: '88',
-title: 'Circular Economy Principles',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/88.mp3',
-text: "A circular economy challenges the traditional linear 'take-make-dispose' model. It aims to eliminate waste by designing products for durability, reuse, repair, and recyclability. Materials are kept in use for as long as possible, extracting maximum value. This requires systemic change: innovative business models like product-as-a-service, reverse logistics for collecting used goods, and design that avoids toxic, non-recyclable materials. The goal is to decouple economic activity from the consumption of finite resources, creating a regenerative system that benefits business, society, and the environment by reducing pollution and conserving raw materials.",
-question: "What is a key objective of the circular economic model?",
+id: '89',
+title: 'Climate Change',
+audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/89.mp3',
+text: "Climate change is causing rising temperatures and extreme weather. People are encouraged to reduce waste and save energy.",
+question: "What is one effect of climate change?",
 options: [
-{ id: 'A', text: "To accelerate the rate of resource extraction and product disposal." },
-{ id: 'B', text: "To design products that break down quickly to save storage space." },
-{ id: 'C', text: "To increase dependence on single-use, disposable packaging." },
-{ id: 'D', text: "To keep materials in productive use for as long as possible, eliminating waste." }  
+{ id: 'A', text: "Lower temperatures." },
+{ id: 'B', text: "Less rainfall everywhere." },
+{ id: 'C', text: "No weather changes." },
+{ id: 'D', text: "Rising temperatures." }
 ],
 correctOption: 'D'
 },
 {
-id: '89',
-title: 'Neuroplasticity and Learning',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/89.mp3',
-text: "Neuroplasticity, the brain's ability to reorganize itself by forming new neural connections throughout life, has overturned the old dogma of a hardwired adult brain. Learning a new skill, recovering from injury, or adapting to new experiences can physically change the brain's structure. This involves synaptic pruning (removing weak connections) and strengthening frequently used pathways. Factors like focused attention, repetition, and even sleep are crucial for consolidation. Understanding neuroplasticity underscores that intellectual capacity is not fixed, promoting a 'growth mindset.' It has profound implications for education, rehabilitation, and cognitive therapy.",
-question: "What does the concept of neuroplasticity fundamentally challenge?",
+id: '90',
+title: 'Teamwork Skills',
+audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/90.mp3',
+text: "Working in a team helps people share ideas and solve problems faster. Good communication is important for successful teamwork.",
+question: "Why is teamwork useful?",
 options: [
-{ id: 'A', text: "The idea that the brain can change its physical structure in response to experience." },
-{ id: 'B', text: "The outdated belief that the adult brain is static and unchangeable." },
-{ id: 'C', text: "The role of sleep in memory formation." },
-{ id: 'D', text: "The necessity of having a fixed intellectual capacity from birth." }
+{ id: 'A', text: "It avoids communication." },
+{ id: 'B', text: "It helps solve problems faster." },
+{ id: 'C', text: "It increases conflict." },
+{ id: 'D', text: "It wastes time." }
 ],
 correctOption: 'B'
-},
-{
-id: '90',
-title: 'The Trolley Problem and Ethics',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/90.mp3',
-text: "The trolley problem is a philosophical thought experiment in ethics. Imagine a runaway trolley heading towards five people on a track. You can pull a lever to divert it onto another track, where it will kill one person. Do you intervene? This dilemma contrasts utilitarian ethics (save the greater number) with deontological ethics (do not actively kill an innocent). Modern variations involve self-driving car algorithms. The problem has no universally accepted answer but serves to reveal our intuitive moral reasoning, the weight we give to action vs. inaction, and the challenges of programming ethical principles into machines.",
-question: "What two ethical frameworks are primarily contrasted in the trolley problem?",
-options: [
-{ id: 'A', text: "Capitalism and Socialism." },
-{ id: 'B', text: "Realism and Idealism." },
-{ id: 'C', text: "Utilitarianism and Deontology." },  
-{ id: 'D', text: "Aesthetics and Logic." }
-],
-correctOption: 'C'
 },
 {
 id: '91',
@@ -1307,7 +1309,7 @@ options: [
 { id: 'C', text: "It reduces pollution." },
 { id: 'D', text: "It removes bus routes." }
 ],
-correctOption: 'D'
+correctOption: 'C'
 },
 {
 id: '94',
@@ -1321,7 +1323,7 @@ options: [
 { id: 'C', text: "It is flexible." },
 { id: 'D', text: "It limits access to lessons." }
 ],
-correctOption: 'B'
+correctOption: 'C'
 },
 {
 id: '95',
@@ -1338,33 +1340,34 @@ options: [
 correctOption: 'D'
 },
 {
-id: '96',
-title: 'Local Markets',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/96.mp3',
-text: "Local markets offer fresh food and handmade goods. Many people enjoy shopping there because it supports local sellers.",
-question: "Why do people shop at local markets?",
-options: [
-{ id: 'A', text: "To avoid fresh food." },
-{ id: 'B', text: "To increase food waste." },
-{ id: 'C', text: "To support local sellers." },
-{ id: 'D', text: "To close small shops." }
-],
-correctOption: 'C'
-},
+  id: '96',
+  title: "At the Doctor’s Surgery",
+  audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/96.mp3',
+  text: "Last Monday, I felt very unwell. I had a bad headache, a sore throat and a high temperature. I called my doctor's surgery and spoke to the receptionist. She arranged an appointment for me at 11:30 the same morning. When I arrived, I sat in the waiting room for about ten minutes. Dr. Patel called me in and asked me about my symptoms. She checked my ears, my throat and my temperature. She told me I had a throat infection and needed antibiotics. She also said I should rest at home for two days and drink plenty of water. I followed her advice and now I feel much better.",
+  question: "What was Dr. Patel's advice?",
+  options: [
+    { id: 'A', text: "Take antibiotics and rest for two days." },
+    { id: 'B', text: "Go to hospital immediately." },
+    { id: 'C', text: "Exercise more to get better." },
+    { id: 'D', text: "Eat only cold food." }
+  ],
+  correctOption: 'A'
+}
+,
 {
-id: '97',
-title: 'Healthy Sleep',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/97.mp3',
-text: "Getting enough sleep helps people stay focused and productive. Experts recommend keeping a regular bedtime routine.",
-question: "Why is sleep important?",
-options: [
-{ id: 'A', text: "It helps people stay focused." },
-{ id: 'B', text: "It increases tiredness." },
-{ id: 'C', text: "It stops the body from resting." },
-{ id: 'D', text: "It removes the need for food." }
-],
-correctOption: 'A'
-},
+    id: '97',
+    title: "A Surprise Visitor",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/97.mp3',
+    text: "Yesterday, I was sitting in my living room reading a book when the doorbell rang. I was not expecting anyone. I opened the door and saw my cousin, David, who I had not seen for three years. He lives in Australia and decided to visit me as a surprise. I was so shocked that I almost dropped my book. We hugged and laughed. He said he was in the country for a work conference and had a free day to see me. We spent the whole afternoon talking, drinking tea and looking at old photos. It was a wonderful, unexpected gift.",
+    question: "How did the speaker feel when she saw her cousin?",
+    options: [
+      { id: 'A', text: "Shocked and happy." },
+      { id: 'B', text: "Angry and confused." },
+      { id: 'C', text: "Sad and lonely." },
+      { id: 'D', text: "Bored and tired." }
+    ],
+    correctOption: 'A'
+  },
 {
 id: '98',
 title: 'Recycling Plastic',
@@ -1373,9 +1376,9 @@ text: "Recycling plastic reduces waste and protects the environment. Many commun
 question: "Why is recycling plastic helpful?",
 options: [
 { id: 'A', text: "It increases pollution." },
-{ id: 'B', text: "It reduces waste." },
+{ id: 'B', text: "It stops recycling centres." },
 { id: 'C', text: "It makes plastic heavier." },
-{ id: 'D', text: "It stops recycling centres." }
+{ id: 'D', text: "It reduces waste." } 
 ],
 correctOption: 'D'
 },
@@ -1387,40 +1390,40 @@ text: "Walking is a simple exercise that improves heart health and reduces stres
 question: "What is one benefit of walking?",
 options: [
 { id: 'A', text: "It increases stress." },
-{ id: 'B', text: "It requires expensive equipment." },
-{ id: 'C', text: "It improves heart health." },
+{ id: 'B', text: "It improves heart health." }, 
+{ id: 'C', text: "It requires expensive equipment." },
 { id: 'D', text: "It prevents relaxation." }
 ],
 correctOption: 'B'
 },
 {
-id: '100',
-title: 'Studying Abroad',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/100.mp3',
-text: "Studying abroad allows students to experience new cultures and improve language skills. It also helps them become more independent.",
-question: "What is one benefit of studying abroad?",
-options: [
-{ id: 'A', text: "It reduces independence." },
-{ id: 'B', text: "It prevents cultural learning." },
-{ id: 'C', text: "It improves language skills." },
-{ id: 'D', text: "It limits travel opportunities." }
-],
-correctOption: 'C'
-},
-{
-id: '101',
-title: 'Healthy Cooking',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/101.mp3',
-text: "Cooking at home allows people to choose fresh ingredients and avoid unhealthy additives. It is also a good way to save money.",
-question: "Why do people cook at home?",
-options: [
-{ id: 'A', text: "To choose fresh ingredients." },
-{ id: 'B', text: "To add more unhealthy additives." },
-{ id: 'C', text: "To avoid eating vegetables." },
-{ id: 'D', text: "To spend more money." }
-],
-correctOption: 'A'
-},
+    id: '100',
+    title: 'A School Trip',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/100.mp3',
+    text: "Attention, Year 5 students! This is a message about our trip to the Natural History Museum next Tuesday. Please arrive at school at 8:15 AM, not the usual 8:45. The coach will leave at 8:30 sharp, so don’t be late. You need to bring a packed lunch and a bottle of water. Do not bring any sweets or fizzy drinks. Wear your school uniform and comfortable shoes because we will walk a lot. We will return to school at about 4:00 PM. The cost of the trip is twelve pounds. Please give your permission slip and money to your class teacher by Friday.",
+    question: "What are students asked to bring for lunch?",
+    options: [
+      { id: 'A', text: "Sweets and chocolate." },
+      { id: 'B', text: "Fizzy drinks." },
+      { id: 'C', text: "Money to buy food." },
+      { id: 'D', text: "A packed lunch and water." }
+    ],
+    correctOption: 'D'
+  },
+  {
+    id: '101',
+    title: 'A Birthday Party',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/101.mp3',
+    text: "My little sister Chloe turned five last Saturday. We organised a birthday party for her in our garden. We put up colourful balloons and a big sign that said 'Happy Birthday Chloe'. Twelve children came from her nursery school. We played games like musical chairs and pass the parcel. My mum made a huge strawberry cake with five candles. Chloe blew out all the candles in one go, and everyone clapped. After that, we had sandwiches, crisps and juice. The party lasted three hours. Chloe said it was the best day ever. She got many presents, but her favourite was a toy unicorn.",
+    question: "What did Chloe receive as a present that she liked the most?",
+    options: [
+      { id: 'A', text: "A toy unicorn." },
+      { id: 'B', text: "A new dress." },
+      { id: 'C', text: "A storybook." },
+      { id: 'D', text: "A board game." }
+    ],
+    correctOption: 'A'
+  },
 {
 id: '102',
 title: 'Digital Safety',
@@ -1433,22 +1436,22 @@ options: [
 { id: 'C', text: "By using strong passwords." },
 { id: 'D', text: "By posting private details." }
 ],
-correctOption: 'B'
+correctOption: 'C'
 },
-{
-id: '103',
-title: 'Community Events',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/103.mp3',
-text: "Community events bring neighbours together and help build strong relationships. They often include music, food, and activities.",
-question: "What is one purpose of community events?",
-options: [
-{ id: 'A', text: "To separate neighbours." },
-{ id: 'B', text: "To build strong relationships." },
-{ id: 'C', text: "To reduce social contact." },
-{ id: 'D', text: "To stop families attending." }
-],
-correctOption: 'D'
-},
+  {
+    id: '103',
+    title: "An Evening in the Park",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/103.mp3',
+    text: "Every evening after dinner, I take my dog, Buster, to the park near my house. Buster is a small brown dog with very long ears. He loves running on the grass and playing with other dogs. I often meet my neighbour, Mrs. Khan, there with her dog, Lucy. We sit on a bench and chat while the dogs play. Last night, Buster found an old tennis ball behind a tree and he was so excited. He carried it home in his mouth. It was a perfect end to a busy day. I always sleep well after our walk.",
+    question: "Who does the speaker often meet in the park?",
+    options: [
+      { id: 'A', text: "Her sister." },
+      { id: 'B', text: "Her neighbour Mrs. Khan." },
+      { id: 'C', text: "A dog trainer." },
+      { id: 'D', text: "A friend from work." }
+    ],
+    correctOption: 'B'
+  },
 {
 id: '104',
 title: 'Saving Electricity',
@@ -1456,27 +1459,27 @@ audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choi
 text: "Turning off unused lights and unplugging devices can help reduce electricity use. These actions also lower monthly bills.",
 question: "How can people save electricity?",
 options: [
-{ id: 'A', text: "By leaving lights on." },
-{ id: 'B', text: "By unplugging unused devices." },
+{ id: 'A', text: "By unplugging unused devices." },
+{ id: 'B', text: "By leaving lights on." }, 
 { id: 'C', text: "By buying more electronics." },
 { id: 'D', text: "By using old appliances." }
 ],
 correctOption: 'A'
 },
 {
-id: '105',
-title: 'Healthy Drinks',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/105.mp3',
-text: "Many people choose water or herbal tea instead of sugary drinks. These options help maintain good hydration without extra calories.",
-question: "Why do people choose water?",
-options: [
-{ id: 'A', text: "It contains extra sugar." },
-{ id: 'B', text: "It increases thirst." },
-{ id: 'C', text: "It has no extra calories." },
-{ id: 'D', text: "It contains artificial flavours." }
-],
-correctOption: 'C'
-},
+    id: '105',
+    title: "A Phone Call",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/105.mp3',
+    text: "Hi Sarah, it's Lisa. I'm just calling to confirm our appointment for tomorrow. We said we would meet at the café next to the museum at half past one. Is that still okay for you? I have to finish work at one, so I might be five or ten minutes late, but please wait for me if you arrive first. I have the book you wanted to borrow, so I will bring it. Also, I thought we could see the new photography exhibition at the museum after coffee, if you have time. Call me back or send me a text. Bye!",
+    question: "What time was the original meeting time?",
+    options: [
+      { id: 'A', text: "1:00 PM." },
+      { id: 'B', text: "12:30 PM." },
+      { id: 'C', text: "2:00 PM." },
+      { id: 'D', text: "1:30 PM." }
+    ],
+    correctOption: 'D'
+  },
 {
 id: '106',
 title: 'Job Interviews',
@@ -1499,9 +1502,9 @@ text: "Walking in nature helps people relax and reduce stress. Many parks offer 
 question: "Why do people enjoy nature walks?",
 options: [
 { id: 'A', text: "They increase stress." },
-{ id: 'B', text: "They help people relax." },
+{ id: 'B', text: "They make parks noisy." }, 
 { id: 'C', text: "They reduce outdoor activity." },
-{ id: 'D', text: "They make parks noisy." }
+{ id: 'D', text: "They help people relax." }
 ],
 correctOption: 'D'
 },
@@ -1513,8 +1516,8 @@ text: "Online shopping allows people to buy products from home. It is convenient
 question: "What is one advantage of online shopping?",
 options: [
 { id: 'A', text: "It requires visiting many shops." },
-{ id: 'B', text: "It offers a wide range of products." },
-{ id: 'C', text: "It makes delivery impossible." },
+{ id: 'B', text: "It makes delivery impossible." },
+{ id: 'C', text: "It offers a wide range of products." },
 { id: 'D', text: "It guarantees perfect quality." }
 ],
 correctOption: 'C'
@@ -1527,26 +1530,26 @@ text: "Volunteering allows people to help their community and meet new friends. 
 question: "Why do people volunteer?",
 options: [
 { id: 'A', text: "To avoid meeting people." },
-{ id: 'B', text: "To support their community." },
+{ id: 'B', text: "To stop helping others." },
 { id: 'C', text: "To reduce social contact." },
-{ id: 'D', text: "To stop helping others." }
+{ id: 'D', text: "To support their community." }
 ],
-correctOption: 'A'
+correctOption: 'D'
 },
 {
-id: '110',
-title: 'Fitness Apps',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/110.mp3',
-text: "Fitness apps help people track their steps, workouts, and sleep. They motivate users to stay active and reach their goals.",
-question: "Why do people use fitness apps?",
-options: [
-{ id: 'A', text: "To avoid exercise." },
-{ id: 'B', text: "To track their progress." },
-{ id: 'C', text: "To reduce motivation." },
-{ id: 'D', text: "To stop setting goals." }
-],
-correctOption: 'C'
-},
+    id: '110',
+    title: "Buying New Shoes",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/110.mp3',
+    text: "I need new running shoes. My old ones are worn out and my feet hurt when I run. Yesterday, I went to a big sports shop on Oxford Street. There were so many shoes in different colours and brands. A young shop assistant helped me. She measured my feet and asked me about the type of running I do, either on roads or in the park. I tried on three pairs. The first were too tight, the second were comfortable but the colour was ugly. The third pair felt perfect and they were dark blue, my favourite colour. They cost sixty-five pounds, and I bought them.",
+    question: "Why did the speaker choose the third pair of shoes?",
+    options: [
+      { id: 'A', text: "They were the cheapest." },
+      { id: 'B', text: "They were recommended by a friend." },
+      { id: 'C', text: "They felt perfect and were the right colour." },
+      { id: 'D', text: "They had special lights." }
+    ],
+    correctOption: 'C'
+  },
 {
 id: '111',
 title: 'Healthy Breakfast',
@@ -1559,7 +1562,7 @@ options: [
 { id: 'C', text: "It provides morning energy." },
 { id: 'D', text: "It increases hunger." }
 ],
-correctOption: 'A'
+correctOption: 'C'
 },
 {
 id: '112',
@@ -1573,7 +1576,7 @@ options: [
 { id: 'C', text: "Unlimited printing." },
 { id: 'D', text: "Private offices." }
 ],
-correctOption: 'C'
+correctOption: 'B'
 },
 {
 id: '113',
@@ -1587,7 +1590,7 @@ options: [
 { id: 'C', text: "It helps the body function well." },
 { id: 'D', text: "It stops digestion." }
 ],
-correctOption: 'B'
+correctOption: 'C'
 },
 {
 id: '114',
@@ -1601,7 +1604,7 @@ options: [
 { id: 'C', text: "By carrying everything in one hand." },
 { id: 'D', text: "By ignoring surroundings." }
 ],
-correctOption: 'A'
+correctOption: 'B'
 },
 {
 id: '115',
@@ -1615,22 +1618,23 @@ options: [
 { id: 'C', text: "To make work confusing." },
 { id: 'D', text: "To stop learning." }
 ],
-correctOption: 'D'
+correctOption: 'B'
 },
 {
-id: '116',
-title: 'Cooking at Home',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/116.mp3',
-text: "Cooking at home allows people to control ingredients and avoid unhealthy additives. It is also a great way to save money.",
-question: "Why do people cook at home?",
-options: [
-{ id: 'A', text: "To control ingredients." },
-{ id: 'B', text: "To avoid vegetables." },
-{ id: 'C', text: "To add unhealthy additives." },
-{ id: 'D', text: "To spend more money." }
-],
-correctOption: 'C'
-},
+    id: '116',
+    title: "A Lost Cat",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/116.mp3',
+    text: "Have you seen a small black cat? Our cat, Midnight, has been missing since Monday evening. He is completely black with green eyes and is wearing a red collar with a small bell. He is very friendly but might be scared because he never goes far. We live on Park Road, near the big supermarket. We have put posters around the neighbourhood and asked our neighbours to check their gardens. If you see him, please call us on 07700 900555. We are offering a reward of twenty pounds for his safe return. My children miss him very much. Thank you.",
+    question: "What distinguishing feature does Midnight the cat have?",
+    options: [
+      { id: 'A', text: "White paws and blue eyes." },
+      { id: 'B', text: "A long fluffy tail." },
+      { id: 'C', text: "A red collar with a bell." },
+      { id: 'D', text: "No collar at all." }
+    ],
+    correctOption: 'C'
+ },
+
 {
 id: '117',
 title: 'Time Management',
@@ -1643,36 +1647,37 @@ options: [
 { id: 'C', text: "Removing all tasks." },
 { id: 'D', text: "Avoiding responsibilities." }
 ],
-correctOption: 'A'
+correctOption: 'B'
 },
-{
-id: '118',
-title: 'Online Meetings',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/118.mp3',
-text: "Online meetings allow people to work together from different locations. They save time and make communication easier for remote teams.",
-question: "Why are online meetings helpful?",
-options: [
-{ id: 'A', text: "They require travel." },
-{ id: 'B', text: "They help remote teams communicate." },
-{ id: 'C', text: "They make teamwork impossible." },
-{ id: 'D', text: "They remove all planning." }
-],
-correctOption: 'D'
-},
-{
-id: '119',
-title: 'Healthy Snacks',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/119.mp3',
-text: "Healthy snacks like fruit and nuts provide energy without too much sugar. They help people stay full between meals.",
-question: "Why do people choose healthy snacks?",
-options: [
-{ id: 'A', text: "They contain a lot of sugar." },
-{ id: 'B', text: "They provide energy." },
-{ id: 'C', text: "They make people hungrier." },
-{ id: 'D', text: "They reduce nutrition." }
-],
-correctOption: 'C'
-},
+  {
+    id: '118',
+    title: "A Day at Work",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/118.mp3',
+    text: "I am a postman. My day starts very early. I arrive at the sorting office at 5:30 in the morning. My colleagues and I sort hundreds of letters and parcels for our delivery area. Then I put my bags on my bicycle or small van and start my round. I deliver post to about three hundred addresses every day. I know many people on my route, and they often say hello or ask about the weather. I enjoy working outdoors, even when it is cold. I usually finish by 1:30 PM. Then I go home, have a late lunch and rest. It is a simple but satisfying job.",
+    question: "How does the speaker feel about his job?",
+    options: [
+      { id: 'A', text: "He finds it satisfying." },
+      { id: 'B', text: "He thinks it is boring." },
+      { id: 'C', text: "He wants to change it." },
+      { id: 'D', text: "He dislikes the early start." }
+    ],
+    correctOption: 'A'
+  },
+  {
+    id: '119',
+    title: "A Film Review",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/119.mp3',
+    text: "Last night, I watched a film called 'The Secret Garden'. It is based on a famous children's book. The story is about a young girl called Mary who goes to live in her uncle's big house in the countryside. She discovers a hidden garden and, with the help of a local boy, she brings it back to life. The film is beautiful, with lovely music and wonderful acting by the young stars. I laughed and also almost cried. It is a perfect film for the whole family. I would definitely recommend it, especially if you like stories about friendship and nature.",
+    question: "What did the speaker think of the film?",
+    options: [
+      { id: 'A', text: "It was too sad." },
+      { id: 'B', text: "She would definitely recommend it." },
+      { id: 'C', text: "The acting was terrible." },
+      { id: 'D', text: "It was only for young children." }
+    ],
+    correctOption: 'B'
+  },
+
 {
 id: '120',
 title: 'Reading for Fun',
@@ -1716,19 +1721,19 @@ options: [
 correctOption: 'C'
 },
 {
-id: '123',
-title: 'Daily Exercise',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/123.mp3',
-text: "Daily exercise helps improve physical health and mental well‑being. Even short activities like walking or stretching can make a positive difference.",
-question: "What is one benefit of daily exercise?",
-options: [
-{ id: 'A', text: "It improves physical health." },
-{ id: 'B', text: "It increases stress." },
-{ id: 'C', text: "It removes the need for sleep." },
-{ id: 'D', text: "It reduces energy levels." }
-],
-correctOption: 'A'
-},
+    id: '123',
+    title: "A Career Change",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/123.mp3',
+    text: "My name is Rachel, and after ten years working as an accountant in a large firm, I've made a big decision. I've resigned and I'm going back to university to become a primary school teacher. It wasn't an easy choice because my previous job paid well and was very stable. However, I realised that spending my days looking at spreadsheets simply didn't make me happy anymore. I've always loved working with children, and during the weekends I used to volunteer at a local youth club. That experience convinced me that teaching is my real passion. The course starts in September, and even though I'll earn less money in the future, I believe it's the right path for me.",
+    question: "What motivated Rachel to change her career?",
+    options: [
+      { id: 'A', text: "She was made redundant from her accounting job." },
+      { id: 'B', text: "She discovered a passion for working with children." },
+      { id: 'C', text: "Her previous job did not pay enough." },
+      { id: 'D', text: "She wanted to work in a university." }
+    ],
+    correctOption: 'B'
+  },
 {
 id: '124',
 title: 'Online Learning Tools',
@@ -1771,34 +1776,34 @@ options: [
 ],
 correctOption: 'C'
 },
-{
-id: '127',
-title: 'Healthy Cooking',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/127.mp3',
-text: "Cooking meals at home allows people to control ingredients and avoid unhealthy additives. It is also a great way to spend time with family.",
-question: "Why do people cook at home?",
-options: [
-{ id: 'A', text: "To control ingredients." },
-{ id: 'B', text: "To avoid vegetables." },
-{ id: 'C', text: "To add unhealthy additives." },
-{ id: 'D', text: "To spend more money." }
-],
-correctOption: 'A'
-},
-{
-id: '128',
-title: 'Digital Safety',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/128.mp3',
-text: "People share a lot of personal information online. Using strong passwords and avoiding unknown links helps protect accounts from hackers.",
-question: "How can people stay safe online?",
-options: [
-{ id: 'A', text: "By sharing passwords." },
-{ id: 'B', text: "By clicking every link." },
-{ id: 'C', text: "By posting private details." },
-{ id: 'D', text: "By using strong passwords." }
-],
-correctOption: 'D'
-},
+  {
+    id: '127',
+    title: "Booking a Hotel Room",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/127.mp3',
+    text: "Good afternoon, this is the Grand Harbour Hotel. How can I help you? Oh, hello, I'd like to make a reservation for two nights, from the 14th to the 16th of July. Yes, we have rooms available. Would you prefer a double or a twin room? A double room with a sea view would be perfect, but if that's not available, a twin room is also fine. We do have one double sea-view room left, but it's on the third floor and the lift is currently out of order. Is that a problem? Not at all, I don't mind using the stairs. Excellent. I should also mention that I'm arriving quite late, around 11 p.m., because my flight lands at 10. That's no problem; our reception is open 24 hours. Could you please confirm the price? The room is £95 per night, and that includes breakfast. Perfect, I'll go ahead and book it.",
+    question: "What special request or situation did the man mention?",
+    options: [
+      { id: 'A', text: "He needs a room on the ground floor." },
+      { id: 'B', text: "He will arrive very late at night." },
+      { id: 'C', text: "He wants to check in early in the morning." },
+      { id: 'D', text: "He would like a twin room with a sea view." }
+    ],
+    correctOption: 'B'
+  },
+  {
+    id: '128',
+    title: "A Community Garden",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/128.mp3',
+    text: "If you walk along Baker Street these days, you might notice something new. A piece of land that used to be an abandoned car park has been transformed into a beautiful community garden. A group of about thirty volunteers worked every weekend for six months to make it happen. They planted flowers, vegetables and even a few fruit trees. The garden isn't just a place to grow food; it also brings local residents together. Many neighbours who had never spoken before are now good friends. Furthermore, the garden has helped improve the area's appearance and, according to one volunteer, crime in the nearby streets has gone down since the project began. The group now organises regular events, including outdoor film nights and gardening workshops for children.",
+    question: "What additional positive effect of the garden is mentioned?",
+    options: [
+      { id: 'A', text: "It raised a lot of money for the council." },
+      { id: 'B', text: "It attracted many tourists." },
+      { id: 'C', text: "It may have helped reduce local crime." },
+      { id: 'D', text: "It increased house prices immediately." }
+    ],
+    correctOption: 'C'
+  },
 {
 id: '129',
 title: 'Community Volunteering',
@@ -1813,20 +1818,21 @@ options: [
 ],
 correctOption: 'B'
 },
-{
-id: '130',
-title: 'Using Fitness Apps',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/130.mp3',
-text: "Fitness apps help people track their steps, workouts, and sleep. They motivate users to stay active and reach their health goals.",
-question: "Why do people use fitness apps?",
-options: [
-{ id: 'A', text: "To avoid exercise." },
-{ id: 'B', text: "To reduce motivation." },
-{ id: 'C', text: "To track their progress." },
-{ id: 'D', text: "To stop setting goals." }
-],
-correctOption: 'C'
-},
+  {
+    id: '130',
+    title: "Weather Report",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/130.mp3',
+    text: "And now a quick look at tomorrow's weather. Most areas will have a cloudy start, but the sun will come out by midday. Temperatures will be around eighteen degrees Celsius, which is quite warm for this time of year. However, in the north, there is a chance of some light rain in the late afternoon, so take an umbrella if you are going out. The south will stay dry and bright. Winds will be light across the whole country. Overall, it should be a pleasant spring day. The night will be cooler, with temperatures dropping to about eight degrees.",
+    question: "What is the weather prediction for the north tomorrow?",
+    options: [
+      { id: 'A', text: "Strong winds all day." },
+      { id: 'B', text: "Sunny and dry." },
+      { id: 'C', text: "Light rain in the late afternoon." },
+      { id: 'D', text: "Very warm and sunny from the morning." }
+    ],
+    correctOption: 'C'
+  },
+
 {
 id: '131',
 title: 'Healthy Morning Routines',
@@ -1870,33 +1876,34 @@ options: [
 correctOption: 'A'
 },
 {
-id: '134',
-title: 'Online Courses',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/134.mp3',
-text: "Online courses allow people to learn new skills from home. They are flexible and often cheaper than traditional classes.",
-question: "Why do people choose online courses?",
-options: [
-{ id: 'A', text: "They require travel." },
-{ id: 'B', text: "They remove all learning materials." },
-{ id: 'C', text: "They are flexible and convenient." },
-{ id: 'D', text: "They are always more expensive." }
-],
-correctOption: 'C'
-},
+    id: '134',
+    title: 'A New Restaurant',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/134.mp3',
+    text: "Last night, my husband and I tried a new Mexican restaurant in the city centre. It is called 'Casa Bonita'. The restaurant is on Green Street, next to the bookshop. When we arrived, it was very busy, so we waited fifteen minutes for a table. The waiters were friendly and the decoration was colourful. I ordered chicken tacos and my husband had beef burritos. The food was delicious, and the portions were big. For dessert, we shared a piece of chocolate cake. The meal cost around forty pounds, which is not cheap, but we both thought it was worth it. We will definitely go back.",
+    question: "How much did the meal cost?",
+    options: [
+      { id: 'A', text: "Fourteen pounds." },
+      { id: 'B', text: "Around forty pounds." },
+      { id: 'C', text: "Fifty pounds." },
+      { id: 'D', text: "Thirty pounds." }
+    ],
+    correctOption: 'B'
+  },
+
 {
-id: '135',
-title: 'Healthy Snacks',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/135.mp3',
-text: "Healthy snacks like fruit and nuts provide energy without too much sugar. They help people stay full between meals.",
-question: "Why do people choose healthy snacks?",
-options: [
-{ id: 'A', text: "They contain more sugar." },
-{ id: 'B', text: "They reduce energy levels." },
-{ id: 'C', text: "They make people hungrier." },
-{ id: 'D', text: "They provide energy without too much sugar." }
-],
-correctOption: 'D'
-},
+    id: '135',
+    title: "Moving House",
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/135.mp3',
+    text: "James and Linda are moving house next month. They live in a small flat now, but they need more space because they are expecting a baby. They have found a lovely house with three bedrooms, a nice kitchen and a garden. The house is in a quiet area near a good school. James is very pleased because he can still cycle to his office in twenty minutes. Linda’s parents live just half a mile away, so they can help with the baby. The removal company is coming on the first Saturday of the month. They are packing boxes every evening to get ready.",
+    question: "Why are James and Linda moving?",
+    options: [
+      { id: 'A', text: "They need more space for a baby." },
+      { id: 'B', text: "Linda has a new job." },
+      { id: 'C', text: "They want to live near the city centre." },
+      { id: 'D', text: "Their flat is too expensive." }
+    ],
+    correctOption: 'A'
+  },
 {
 id: '136',
 title: 'Local Tourism',
@@ -1925,48 +1932,49 @@ options: [
 ],
 correctOption: 'C'
 },
+  {
+    id: '138',
+    title: 'Learning to Swim',
+    audioUrl:'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/138.mp3',
+    text: "Sophie is seven years old and she is learning to swim. Every Wednesday after school, her mum takes her to the swimming pool. At first, Sophie was afraid of the water. But her teacher, Mr. Green, is very patient. He taught her how to float and how to kick her legs. Last week, Sophie swam five metres by herself for the first time. She was so proud. Mr. Green gave her a gold star sticker. Sophie wants to swim ten metres next time. Her dream is to swim in the sea during the summer holiday. She loves the water now.",
+    question: "What achievement did Sophie reach last week?",
+    options: [
+      { id: 'A', text: "She swam in the sea." },
+      { id: 'B', text: "She received a gold medal." },
+      { id: 'C', text: "She swam five metres alone." },
+      { id: 'D', text: "She taught another child to float." }
+    ],
+    correctOption: 'C'
+  },
+
 {
-id: '138',
-title: 'Healthy Cooking',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/138.mp3',
-text: "Cooking at home allows people to control ingredients and avoid unhealthy additives. It is also a great way to spend time with family.",
-question: "Why do people cook at home?",
-options: [
-{ id: 'A', text: "To control ingredients." },
-{ id: 'B', text: "To avoid vegetables." },
-{ id: 'C', text: "To add unhealthy additives." },
-{ id: 'D', text: "To spend more money." }
-],
-correctOption: 'A'
-},
+    id: '139',
+    title: "At the Train Station",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/139.mp3',
+    text: "Good afternoon, passengers. This is an announcement for all travellers on platform five. We are sorry to tell you that the 2:30 train to Oxford is delayed. The new departure time will be 3:15 PM. This is because of a problem with the signal system near Didcot. We understand this is not good news, and we are very sorry for the delay. Passengers with tickets for the 2:30 service may also use the next fast train to Oxford, which leaves at 3:00 PM from platform six. Please check your tickets and ask a member of staff if you have any questions. Thank you for your patience.",
+    question: "What is the new departure time for the delayed train?",
+    "options": [
+      { id: 'A', text: "2:30 PM." },
+      { id: 'B', text: "3:15 PM." },
+      { id: 'C', text: "3:00 PM." },
+      { id: 'D', text: "3:45 PM." }
+    ],
+    correctOption: 'B'
+  },
 {
-id: '139',
-title: 'Public Transport',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/139.mp3',
-text: "Public transport helps reduce traffic and pollution. Many cities encourage people to use buses and trains instead of cars.",
-question: "Why do cities promote public transport?",
-options: [
-{ id: 'A', text: "It increases traffic." },
-{ id: 'B', text: "It makes travel slower." },
-{ id: 'C', text: "It removes bus routes." },
-{ id: 'D', text: "It reduces pollution." }
-],
-correctOption: 'D'
-},
-{
-id: '140',
-title: 'Studying Abroad',
-audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/140.mp3',
-text: "Studying abroad allows students to experience new cultures and improve language skills. It also helps them become more independent.",
-question: "What is one benefit of studying abroad?",
-options: [
-{ id: 'A', text: "It reduces independence." },
-{ id: 'B', text: "It prevents cultural learning." },
-{ id: 'C', text: "It improves language skills." },
-{ id: 'D', text: "It limits travel opportunities." }
-],
-correctOption: 'C'
-},
+    id: '140',
+    title: "Flight Gate Change",
+    audioUrl: 'https://storage.googleapis.com/pte_flow_audio/listening/Multiple_Choice_Single/140.mp3',
+    text: "This is an urgent announcement for passengers travelling on Flight BA478 to Madrid. Due to a technical issue with the aircraft originally assigned to this route, your flight will now depart from Gate 22, not Gate 17 as printed on your boarding pass. Boarding will begin in approximately fifteen minutes. We apologise for this late change. Please proceed immediately to Gate 22, which is located in Terminal C, on the upper level. Passengers requiring extra assistance should make themselves known to a member of our ground staff, who will be happy to help. Once again, Flight BA478 to Madrid now departs from Gate 22. Thank you for your understanding.",
+    question: "What is the new departure gate for the Madrid flight?",
+    options: [
+      { id: 'A', text: "Gate 22." },
+      { id: 'B', text: "Gate 17." },
+      { id: 'C', text: "Gate 15." },
+      { id: 'D', text: "Gate 30." }
+    ],
+    correctOption: 'A'
+  },
 
 //C1 Level (Items 141-145)
 {
