@@ -9,7 +9,6 @@ import { REPEAT_SENTENCE_QUESTIONS } from '../constants/repeatSentenceData';
 import { FILL_BLANKS_QUESTIONS } from '../constants/fillBlanksData';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import CustomLoader from './CustomLoader';
 
 interface SprintQuestion {
   type: string;
@@ -25,7 +24,7 @@ interface Sprint {
   questions?: SprintQuestion[];
   currentRound?: number;
   participantCount?: number;
-  status: 'waiting' | 'ready' | 'active' | 'finished';
+  status: 'waiting' | 'active' | 'finished';
   startTime?: number;
   duration?: number;
   ssid: string;
@@ -53,7 +52,6 @@ export const LiveSprint = () => {
   const [myTotalTime, setMyTotalTime] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [selectedSprintAnswers, setSelectedSprintAnswers] = useState<string[]>([]);
-  const currentSound = useRef<Audio.Sound | null>(null);
   
   const repeatSentenceOptions = useMemo(() => {
     const text = currentQuestion?.text || 'Correct Option';
@@ -65,30 +63,13 @@ export const LiveSprint = () => {
     ].sort(() => Math.random() - 0.5);
   }, [currentQuestion?.id, currentQuestion?.text, Math.floor(timeLeft / 3)]);
 
-  // Cleanup function for audio
-  const stopAllAudio = async () => {
-    try {
-      console.log("[LiveSprint] Stopping all audio...");
-      if (currentSound.current) {
-        await currentSound.current.stopAsync();
-        await currentSound.current.unloadAsync();
-        currentSound.current = null;
-      }
-      Speech.stop();
-    } catch (e) {
-      console.warn("[LiveSprint] Error stopping audio:", e);
-    }
-  };
-
   // Auto-play audio when question is displayed
   useEffect(() => {
-    if (showGame && currentQuestion && activeSprint?.status === 'active') {
+    if (showGame && currentQuestion) {
       const playAudio = async () => {
         try {
-          await stopAllAudio();
           if (currentQuestion.audioUrl) {
             const { sound } = await Audio.Sound.createAsync({ uri: currentQuestion.audioUrl });
-            currentSound.current = sound;
             await sound.playAsync();
           } else if (currentQuestion.text) {
             Speech.speak(currentQuestion.text, { language: 'en-GB', pitch: 1.0, rate: 0.9 });
@@ -97,16 +78,11 @@ export const LiveSprint = () => {
             console.error("Failed to autoplay audio", e);
         }
       };
-      
-      const timer = setTimeout(playAudio, 500); // Increased delay for stability
-      return () => {
-        clearTimeout(timer);
-        stopAllAudio();
-      };
-    } else {
-      stopAllAudio(); // Ensure stop if modal closed or status changed
+      // Slight delay to ensure modal is mounted and visible
+      const timer = setTimeout(playAudio, 300);
+      return () => clearTimeout(timer);
     }
-  }, [showGame, currentQuestion?.id, activeSprint?.status]);
+  }, [showGame, currentQuestion?.id, currentQuestion?.text]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSprintId = useRef<string | null>(null);
@@ -131,16 +107,6 @@ export const LiveSprint = () => {
         lastSprintId.current = activeSprint?.id || null;
      }
   }, [activeSprint?.id]);
-
-  // AUTO-SHOW GAME MODAL FOR ALL PARTICIPANTS
-  useEffect(() => {
-      if (activeSprint?.status === 'active' && !hasSubmitted) {
-          if (!showGame) setShowGame(true);
-      } else if (activeSprint?.status === 'finished') {
-          // Keep showGame true if they just finished so they see results, 
-          // or close it after a delay
-      }
-  }, [activeSprint?.status, hasSubmitted]);
 
   const getQuestion = (type: string, id: string) => {
     const list = (type === 'repeat-sentence' ? REPEAT_SENTENCE_QUESTIONS : FILL_BLANKS_QUESTIONS) as any[];
@@ -196,7 +162,7 @@ export const LiveSprint = () => {
       const unsubscribe = onSnapshot(doc(db, 'sprints', sprintDocId), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data() as Sprint;
-          if (['waiting', 'ready', 'active', 'finished'].includes(data.status)) {
+          if (['waiting', 'active', 'finished'].includes(data.status)) {
               setActiveSprint({ ...data, id: docSnap.id });
               
               if (data.status === 'active' && data.startTime) {
@@ -292,18 +258,17 @@ export const LiveSprint = () => {
   }, [timeLeft, results.length, activeSprint?.currentRound, activeSprint?.status]);
 
   const handleAutoSubmit = () => {
-    if (!hasSubmitted && activeSprint) {
-        if (activeSprint?.questions?.[currentRound]?.type === 'fill-blanks' && currentQuestion) {
+    if (!hasSubmitted) {
+        if (activeSprint?.questionType === 'fill-blanks' && currentQuestion) {
             // Calculate partial score for what they managed to fill
             let correctCount = 0;
             selectedSprintAnswers.forEach((ans, idx) => {
                 if (ans === currentQuestion.correctAnswers[idx]) correctCount++;
             });
-            const totalBlanks = currentQuestion.correctAnswers.length;
-            const finalScore = Math.round((correctCount / (totalBlanks || 1)) * 100);
-            submitResult(finalScore, 30, currentRound);
+            const finalScore = Math.round((correctCount / currentQuestion.correctAnswers.length) * 100);
+            submitResult(finalScore, 30);
         } else {
-            submitResult(0, 30, currentRound); // Failed to answer in time
+            submitResult(0, 30); // Failed to answer in time
         }
     }
   };
@@ -340,6 +305,7 @@ export const LiveSprint = () => {
         currentRound: 0,
         participantCount: 0,
         status: 'waiting',
+        startTime: Date.now(),
         duration: 30,
         ssid: ssid || 'Unknown'
       });
@@ -353,10 +319,10 @@ export const LiveSprint = () => {
     }
   };
 
-  const submitResult = async (roundScore: number, roundTimeSpent: number, forRound: number) => {
-    if (!activeSprint || submittedRound === forRound) return;
+  const submitResult = async (roundScore: number, roundTimeSpent: number) => {
+    if (!activeSprint || hasSubmitted) return;
     
-    setSubmittedRound(forRound);
+    setSubmittedRound(currentRound);
     
     const newScore = myTotalScore + roundScore;
     const newTime = myTotalTime + roundTimeSpent;
@@ -446,7 +412,7 @@ export const LiveSprint = () => {
     hostName: { fontSize: 16, fontWeight: 'bold', color: colors.text },
     
     modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    gameCard: { width: '95%', maxHeight: '90%', backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', flexShrink: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20 },
+    gameCard: { width: '100%', backgroundColor: colors.surface, borderRadius: 24, padding: 24, alignItems: 'center' },
     timerBox: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
     timerText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
     questionTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: 12 },
@@ -487,53 +453,43 @@ export const LiveSprint = () => {
           </Text>
           
           {(activeSprint.hostId === currentUid || auth.currentUser?.email === 'projectgazzy@gmail.com') ? (
-              <View style={{ gap: 8, marginTop: 12 }}>
+              <>
                 {(activeSprint.status === 'waiting') && (
-                    <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => {
-                        setDoc(doc(db, 'sprints', activeSprint.id), { status: 'ready' }, { merge: true });
-                    }}>
-                        <Text style={styles.hostBtnText}>Start Sprint</Text>
-                    </TouchableOpacity>
+                    <View style={{ gap: 8, marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => {
+                            setDoc(doc(db, 'sprints', activeSprint.id), { status: 'active', startTime: Date.now() }, { merge: true });
+                            setShowGame(true);
+                        }}>
+                            <Text style={styles.hostBtnText}>Start Sprint Now</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={clearSprint}>
+                            <Text style={styles.hostBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
-                {(activeSprint.status === 'ready') && (
-                    <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#059669' }]} onPress={() => {
-                        setDoc(doc(db, 'sprints', activeSprint.id), { 
-                            status: 'active', 
-                            startTime: Date.now(),
-                            currentRound: 0,
-                            participantCount: results.length
-                        }, { merge: true });
-                        setShowGame(true);
-                    }}>
-                        <Text style={styles.hostBtnText}>Start Quiz Now</Text>
-                    </TouchableOpacity>
+                {(activeSprint.status === 'active' && timeLeft > 0) && (
+                    <View style={{ gap: 8, marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={endSprint}>
+                          <Text style={styles.hostBtnText}>End Sprint Early</Text>
+                        </TouchableOpacity>
+                        {!showGame && (
+                            <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => setShowGame(true)}>
+                                <Text style={styles.hostBtnText}>Return to Game</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 )}
-                {activeSprint.status !== 'finished' && (
-                    <TouchableOpacity style={[styles.hostBtn, { backgroundColor: '#EF4444' }]} onPress={clearSprint}>
-                        <Text style={styles.hostBtnText}>Cancel Session</Text>
-                    </TouchableOpacity>
-                )}
-                {(activeSprint.status === 'active' && timeLeft > 0) && !showGame && (
-                    <TouchableOpacity style={[styles.hostBtn, { backgroundColor: colors.primary }]} onPress={() => setShowGame(true)}>
-                        <Text style={styles.hostBtnText}>Return to Game</Text>
-                    </TouchableOpacity>
-                )}
-              </View>
+              </>
           ) : (
               <>
                 {(activeSprint.status === 'waiting') && (
                     <View style={{ marginTop: 12, padding: 12, alignItems: 'center' }}>
-                        <Text style={{fontWeight: 'bold', color: colors.subtext}}>Waiting for host to initiate...</Text>
+                        <Text style={{fontWeight: 'bold', color: colors.subtext}}>Waiting for host to start...</Text>
                     </View>
                 )}
-                {(activeSprint.status === 'ready') && (
-                    <View style={{ marginTop: 12, padding: 12, alignItems: 'center' }}>
-                        <Text style={{fontWeight: 'bold', color: '#059669', textAlign: 'center'}}>Lobby Open! Quiz will start shortly...</Text>
-                    </View>
-                )}
-                {(activeSprint.status === 'active' && timeLeft > 0 && !showGame) && (
-                  <TouchableOpacity style={[styles.hostBtn, { marginTop: 12, backgroundColor: '#059669' }]} onPress={() => setShowGame(true)}>
-                      <Text style={styles.hostBtnText}>{hasSubmitted ? 'View Standings' : 'Rejoin Quiz'}</Text>
+                {(!hasSubmitted && activeSprint.status === 'active' && timeLeft > 0) && (
+                  <TouchableOpacity style={[styles.hostBtn, { marginTop: 12 }]} onPress={() => setShowGame(true)}>
+                      <Text style={styles.hostBtnText}>Join Now</Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -569,21 +525,12 @@ export const LiveSprint = () => {
       <Modal visible={showGame && !!activeSprint} transparent animationType="slide">
           <View style={styles.modalBg}>
               <View style={styles.gameCard}>
-                  <ScrollView 
-                    style={{ width: '100%' }} 
-                    contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }}
-                    showsVerticalScrollIndicator={true}
-                    nestedScrollEnabled={true}
-                  >
                   <View style={styles.timerBox}>
                       <Text style={styles.timerText}>{timeLeft}</Text>
                   </View>
-                  {!currentQuestion && !hasSubmitted ? (
-                      <View style={{ padding: 40, alignItems: 'center' }}>
-                         <CustomLoader size={40} message="Loading Question Data..." />
-                      </View>
-                  ) : hasSubmitted ? (
-                      <View style={{ width: '100%', alignItems: 'center' }}>
+                  
+                  {hasSubmitted ? (
+                      <>
                         <MaterialCommunityIcons name="check-circle" size={60} color="#10B981" />
                         <Text style={[styles.questionTitle, { color: '#10B981', marginTop: 10 }]}>Answer Submitted!</Text>
                         
@@ -605,7 +552,7 @@ export const LiveSprint = () => {
                         )}
                         
                         <View style={{ width: '100%', maxHeight: 200 }}>
-                             <ScrollView nestedScrollEnabled={true}>
+                             <ScrollView>
                                 {results.map((res, i) => (
                                     <View key={i} style={styles.lbRow}>
                                         <Text style={styles.lbName}>{i+1}. {res.userName}</Text>
@@ -623,16 +570,16 @@ export const LiveSprint = () => {
                                 <Text style={styles.hostBtnText}>View Board</Text>
                             </TouchableOpacity>
                         )}
-                      </View>
+                      </>
                   ) : (
-                      <View style={{ width: '100%', alignItems: 'center' }}>
+                      <>
                         <Text style={styles.questionTitle}>
                             {activeSprint?.questions ? `Round ${currentRound + 1} of 5:\n` : ''}
                             {activeSprint?.questions?.[currentRound]?.type === 'repeat-sentence' || activeSprint?.questionType === 'repeat-sentence' ? 'Repeat the Sentence' : 'Fill in the Blank'}
                         </Text>
                         
                         {(activeSprint?.questions?.[currentRound]?.type === 'fill-blanks' || activeSprint?.questionType === 'fill-blanks') && (
-                             <View style={{ marginBottom: 20, width: '100%' }}>
+                             <View style={{ marginBottom: 20 }}>
                                 <Text style={[styles.questionDesc, { fontSize: 17, color: colors.text, textAlign: 'left', lineHeight: 26 }]}>
                                     {currentQuestion?.segments?.map((seg: string, i: number) => (
                                         <React.Fragment key={i}>
@@ -684,7 +631,7 @@ export const LiveSprint = () => {
                             </View>
                         )}
 
-                        <Text style={[styles.questionDesc, { marginBottom: 15, textAlign: 'center' }]}>
+                        <Text style={[styles.questionDesc, { marginBottom: 15 }]}>
                             {(activeSprint?.questions?.[currentRound]?.type === 'fill-blanks' || activeSprint?.questionType === 'fill-blanks')
                                 ? `Select word for blank ${selectedSprintAnswers.length + 1}:` 
                                 : 'Identify the correct version/word:'}
@@ -714,7 +661,7 @@ export const LiveSprint = () => {
                                                         if (ans === currentQuestion.correctAnswers[i]) correctCount++;
                                                     });
                                                     const finalScore = Math.round((correctCount / currentQuestion.correctAnswers.length) * 100);
-                                                    submitResult(finalScore, 30 - timeLeft, currentRound);
+                                                    submitResult(finalScore, 30 - timeLeft);
                                                 }
                                             }}
                                         >
@@ -730,16 +677,15 @@ export const LiveSprint = () => {
                                     style={styles.optionBtn} 
                                     onPress={() => {
                                         const isCorrect = opt === currentQuestion?.text;
-                                        submitResult(isCorrect ? 100 : 0, 30 - timeLeft, currentRound);
+                                        submitResult(isCorrect ? 100 : 0, 30 - timeLeft);
                                     }}
                                 >
                                     <Text style={styles.optionText}>{opt}</Text>
                                 </TouchableOpacity>
                             ))
                         )}
-                      </View>
+                      </>
                   )}
-                  </ScrollView>
               </View>
           </View>
       </Modal>

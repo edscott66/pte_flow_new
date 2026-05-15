@@ -4,9 +4,9 @@
     "slug": "pte-flow",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon1.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "pteflow",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pteflow.app",
@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon1.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.pteflow.app",

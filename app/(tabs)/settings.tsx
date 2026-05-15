@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { scoreService } from '../../services/scoreService';
-import { db, ensureAuth, auth, disableAutoLogin } from '../../services/firebase';
+import { db, ensureAuth, signInWithGoogle, auth, disableAutoLogin } from '../../services/firebase';
 import { API_BASE_URL } from '../../constants/config';
 import { collection, getDocs, updateDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -228,27 +228,20 @@ export default function SettingsScreen() {
             setLoading(true);
             try {
               const firebaseUid = auth.currentUser?.uid;
-              const currentGroupId = await scoreService.getGroupId();
-              
               if (firebaseUid) {
-                // Clear the cloud data for this user but PRESERVE their groupId
+                // Clear the cloud data for this user entirely
                 await setDoc(doc(db, 'leaderboard', firebaseUid), {
                   score: 0,
-                  groupId: currentGroupId || firebaseUid,
                   attemptedQuestions: [],
                   localBackup: {},
                   lastUpdate: new Date().toISOString()
-                }, { merge: true });
+                });
               }
-              
               await scoreService.clearProgressOnly();
-              
-              // Restore the groupId locally so they stay in the group
-              if (currentGroupId) {
-                await scoreService.setGroupId(currentGroupId);
-              }
-              
               await AsyncStorage.removeItem('pte_flow_user_name');
+              
+              // We must KEEP the synced flag so it doesn't immediately
+              // try to download legacy backup from their name if available!
               await AsyncStorage.setItem('pte_flow_has_synced_v2', 'true');
               
               router.replace('/');
@@ -269,15 +262,13 @@ export default function SettingsScreen() {
   const [adminCode, setAdminCode] = useState('');
 
   const handleVersionTap = () => {
-    setTapCount(prev => {
-      const newCount = prev + 1;
-      if (newCount >= 7) {
-        setTimeout(() => setAdminModalVisible(true), 0);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        return 0;
-      }
-      return newCount;
-    });
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+    if (newCount >= 7) {
+      setTapCount(0);
+      setAdminModalVisible(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
   };
 
   const handleAdminVerify = async () => {

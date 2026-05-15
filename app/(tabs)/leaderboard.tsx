@@ -35,6 +35,9 @@ export default function Leaderboard() {
   const [myGroupId, setMyGroupId] = useState<string | null>(null);
   const [userScore, setUserScore] = useState<number>(0);
 
+  const [isResetActive, setIsResetActive] = useState(false);
+  const [hasCheckedReset, setHasCheckedReset] = useState(false);
+
   useEffect(() => {
     checkNetwork();
     scoreService.getUserName().then(name => setUserName(name || 'Student'));
@@ -47,14 +50,16 @@ export default function Leaderboard() {
       const currentScore = await scoreService.getScore();
       setUserScore(currentScore);
 
-      let groupId = await scoreService.getGroupId();
+      const resetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
+      setIsResetActive(resetMode === 'true');
+      setHasCheckedReset(true);
       
-      // DEFERRED ACTIVATION: Don't set a groupId until they earn points or scan a QR
-      if (!groupId) {
-        setMyGroupId(null);
-      } else {
-        setMyGroupId(groupId);
+      let groupId = await scoreService.getGroupId();
+      if (!groupId && uid) {
+        groupId = uid;
+        await scoreService.setGroupId(uid);
       }
+      setMyGroupId(groupId);
     };
 
     initData();
@@ -76,17 +81,21 @@ export default function Leaderboard() {
         ...doc.data()
       })) as Lead[];
       
-      // Deduplicate by userId
+      // Deduplicate by name, keeping highest score
       const uniqueLeads: Record<string, Lead> = {};
       rawData.forEach(lead => {
-        if (lead.userId) {
-          if (!uniqueLeads[lead.userId] || lead.score > uniqueLeads[lead.userId].score) {
-            uniqueLeads[lead.userId] = lead;
-          }
+        if (!uniqueLeads[lead.name] || lead.score > uniqueLeads[lead.name].score) {
+          uniqueLeads[lead.name] = lead;
         }
       });
       
       let sortedLeads = Object.values(uniqueLeads).sort((a, b) => b.score - a.score);
+      
+      // APPLY RESET FILTERS
+      const currentResetMode = await AsyncStorage.getItem('pte_flow_leaderboard_hidden');
+      if (currentResetMode === 'true' && currentUserId) {
+        sortedLeads = sortedLeads.filter(l => l.userId === currentUserId);
+      }
 
       setLeads(sortedLeads);
       setLoading(false);
@@ -99,28 +108,6 @@ export default function Leaderboard() {
       unsubscribe();
     };
   }, [myGroupId, currentUserId]);
-
-  const handleShowQR = async () => {
-    const validUserId = currentUserId || auth.currentUser?.uid;
-    // If we don't have a groupId yet, we explicitly "start" one to ensure sync
-    if (!myGroupId && validUserId) {
-      try {
-        await scoreService.setGroupId(validUserId);
-        setMyGroupId(validUserId);
-        
-        // Ensure this is reflected in Firestore so others can see us immediately
-        await ensureAuth();
-        const userDocRef = doc(db, 'leaderboard', validUserId);
-        await setDoc(userDocRef, {
-          groupId: validUserId,
-          lastUpdate: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Failed to activate group on QR show", e);
-      }
-    }
-    setShowQR(true);
-  };
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -222,15 +209,18 @@ export default function Leaderboard() {
     if (data.startsWith('pteflow-group:')) {
       const scannedGroupId = data.split(':')[1];
       if (scannedGroupId) {
+        // Clear the reset mode locally since joining a group re-enables normal functionality
+        await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'false');
+        setIsResetActive(false);
+
         await scoreService.setGroupId(scannedGroupId);
         setMyGroupId(scannedGroupId);
         
-        const validUserId = currentUserId || auth.currentUser?.uid;
         // Update user's firebase document to join the group
-        if (validUserId && userName) {
+        if (currentUserId && userName) {
           try {
             await ensureAuth();
-            const userDocRef = doc(db, 'leaderboard', validUserId);
+            const userDocRef = doc(db, 'leaderboard', currentUserId);
             // Don't reset score here! 'Points are only awarded once a group is formed.'
             // If they had 0, they keep 0, but now they are in a group so future points count here too.
             await setDoc(userDocRef, {
@@ -285,6 +275,10 @@ export default function Leaderboard() {
               // Update local group ID to their own ID (private mode)
               await scoreService.setGroupId(itemUserId);
               setMyGroupId(itemUserId);
+              
+              // Clear any reset flags that might be active
+              await AsyncStorage.setItem('pte_flow_leaderboard_hidden', 'false');
+              setIsResetActive(false);
 
               Alert.alert(
                 "Left Group", 
@@ -378,7 +372,7 @@ export default function Leaderboard() {
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleShowQR}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowQR(true)}>
           <MaterialCommunityIcons name="qrcode" size={24} color="#2563EB" />
           <Text style={styles.actionText}>Show QR</Text>
         </TouchableOpacity>
@@ -402,23 +396,17 @@ export default function Leaderboard() {
           renderItem={renderLead}
           keyExtractor={(item) => item.userId || item.name}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            <>
-              <LiveSprint />
-              {!myGroupId && userScore === 0 && (
-                <View style={{ backgroundColor: colors.surface, padding: 20, borderRadius: 16, marginBottom: 20, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: colors.border }}>
-                  <MaterialCommunityIcons name="trophy-outline" size={40} color={colors.subtext} />
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 10 }}>Leaderboard Inactive</Text>
-                  <Text style={{ textAlign: 'center', color: colors.subtext, marginTop: 5 }}>Earn your first point or scan a QR code to activate your leaderboard presence.</Text>
-                </View>
-              )}
-            </>
-          }
+          ListHeaderComponent={<LiveSprint />}
           ListEmptyComponent={
             <View style={{ alignItems: 'center' }}>
               <Text style={styles.emptyText}>
-                No students on the leaderboard yet.
+                {isResetActive ? "The leaderboard has been reset." : "No students on the leaderboard yet."}
               </Text>
+              {isResetActive && (
+                <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }]}>
+                  Scan a QR code or form a group to resume normal competition.
+                </Text>
+              )}
             </View>
           }
         />
@@ -431,7 +419,7 @@ export default function Leaderboard() {
             <Text style={styles.modalTitle}>Join My Group</Text>
             <View style={styles.qrContainer}>
               <Image 
-                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pteflow-group:${myGroupId || currentUserId || auth.currentUser?.uid}` }}
+                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pteflow-group:${myGroupId || currentUserId}` }}
                 style={{ width: 200, height: 200 }}
                 referrerPolicy="no-referrer"
               />

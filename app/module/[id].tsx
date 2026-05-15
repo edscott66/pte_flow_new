@@ -173,9 +173,8 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
   return (
     <ScrollView 
         style={{flex: 1}} 
-        contentContainerStyle={{paddingBottom: 80}}
+        contentContainerStyle={{paddingBottom: 40}}
         keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled={true}
     >
       <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: 4}}>
         {item.segments.map((segment: string, i: number) => {
@@ -240,12 +239,12 @@ export default function ModuleScreen() {
     headerTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center', lineHeight: 20 },
     carouselContainer: { },
     fullScreenPage: { width: width, padding: 20 },
-    card: { flex: 1, backgroundColor: colors.surface, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+    card: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
     questionIndex: { color: colors.subtext, marginBottom: 10, fontWeight: 'bold' },
     questionText: { fontSize: 20, lineHeight: 30, color: colors.text },
     readingText: { fontSize: 16, lineHeight: 24, color: colors.text },
     label: { fontSize: 12, color: colors.subtext, fontWeight: 'bold', marginBottom: 4 },
-    textScroll: { flex: 1, width: '100%', minHeight: 100, marginBottom: 10, },
+    textScroll: { width: '100%', minHeight: 100, marginBottom: 10, },
     textScrollContent: { flexGrow: 1, justifyContent: 'center' },
     audioPlaceholder: { justifyContent: 'center', alignItems: 'center', width: '100%' },
     listenBox: { alignItems: 'center', gap: 10 },
@@ -441,11 +440,6 @@ export default function ModuleScreen() {
           const newScore = await scoreService.addPoint();
           console.log(`[Score] Global Leaderboard Points: ${newScore}`);
           
-          let groupId = await scoreService.getGroupId();
-          
-          // DO NOT implicitly create a group. The leaderboard is only activated when a group is formed via the Leaderboard tab.
-          // We will still locally increment their score, but we only sync to a group if they have one.
-
           const canEdit = await networkService.canEditTable();
           if (canEdit) {
             const name = await scoreService.getUserName();
@@ -454,15 +448,11 @@ export default function ModuleScreen() {
                 await ensureAuth();
                 const userDocRef = doc(db, 'leaderboard', firebaseUid);
                 const localBackup = await scoreService.getAllLocalData();
-                const updateData: any = {
+                await setDoc(userDocRef, {
                   score: newScore,
                   localBackup,
                   lastUpdate: new Date().toISOString()
-                };
-                if (groupId) {
-                  updateData.groupId = groupId;
-                }
-                await setDoc(userDocRef, updateData, { merge: true });
+                }, { merge: true });
                 console.log("[Score] Global sync successful.");
               } catch (e) {
                 console.error("Firebase sync failed:", e);
@@ -1903,11 +1893,7 @@ export default function ModuleScreen() {
         {isFillBlanks && ( 
           <View style={{flex: 1}}>
             <Text style={styles.reOrderTitle}>{item.title}</Text>
-            <ScrollView 
-                style={{ flex: 1 }} 
-                contentContainerStyle={[styles.fibContainer, { paddingBottom: 60 }]}
-                nestedScrollEnabled={true}
-            >
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fibContainer}>
               <View style={[styles.fibTextWrapper, { paddingHorizontal: 4 }]}>
                 {item.segments.map((segment: string, i: number) => {
                   const words = segment.split(/(\s+)/);
@@ -1946,12 +1932,7 @@ export default function ModuleScreen() {
         )}
         {isFillBlanksRW && (
           <View style={{flex: 1}}>
-            <ScrollView 
-                style={{flex: 1}} 
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled={true}
-                contentContainerStyle={{ paddingBottom: 60 }}
-            >
+            <ScrollView style={{flex: 1}} keyboardShouldPersistTaps="handled">
               <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, paddingHorizontal: 4}}>
                 {item.segments.map((segment: string, i: number) => {
                   const words = segment.split(/(\s+)/);
@@ -1987,13 +1968,15 @@ export default function ModuleScreen() {
         {isFillBlanksListening && (
           <View style={{flex: 1}}>
             {mode !== 'RESULT' ? (
-              <ListeningFillBlanksContent 
-                  item={item} 
-                  lFibAnswers={lFibAnswers} 
-                  lFibResult={lFibResult} 
-                  handleLFibChange={handleLFibChange} 
-                  styles={styles}
-              />
+              <>
+                <ListeningFillBlanksContent 
+                    item={item} 
+                    lFibAnswers={lFibAnswers} 
+                    lFibResult={lFibResult} 
+                    handleLFibChange={handleLFibChange} 
+                    styles={styles}
+                />
+              </>
             ) : (
               <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
                 <MaterialCommunityIcons name="headphones" size={60} color="#10B981" />

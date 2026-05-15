@@ -3,7 +3,11 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+<<<<<<< HEAD
 import { db, auth, ensureAuth } from '../services/firebase';
+=======
+import { db, auth } from '../services/firebase';
+>>>>>>> 066f46c3721d33baa8f5217614e15cb935c978f1
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { scoreService } from '../services/scoreService';
 import { useTheme } from '../context/ThemeContext';
@@ -24,6 +28,7 @@ export default function ActivateScreen() {
 
     setLoading(true);
     try {
+<<<<<<< HEAD
       // 0. Ensure user is authenticated (anonymous is fine)
       await ensureAuth();
       const userId = auth.currentUser?.uid;
@@ -32,6 +37,9 @@ export default function ActivateScreen() {
         throw new Error('Authentication failed. Please check your internet connection and try again.');
       }
 
+=======
+      const userId = auth.currentUser?.uid || 'anonymous';
+>>>>>>> 066f46c3721d33baa8f5217614e15cb935c978f1
       const deviceId = await AsyncStorage.getItem('device_id') || 'unknown';
       
       // 1. Fetch code from Firestore

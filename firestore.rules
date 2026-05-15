@@ -39,6 +39,14 @@ service cloud.firestore {
       return isSignedIn() && (request.auth.token.email == 'projectgazzy@gmail.com' || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
+    // Leaderboard
+    match /leaderboard/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || userId.startsWith('manual_'));
+      allow update: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026') || (isSignedIn() && (request.auth.uid == userId || userId.startsWith('manual_')));
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+
     // Connection test path
     match /test/connection {
       allow read: if true;
@@ -50,16 +58,15 @@ service cloud.firestore {
       allow write: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026');
     }
 
-    // Verification Codes (Hardware/App activation)
+    // User Activations
+    match /user_activations/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
     match /verification_codes/{codeId} {
-      // Allow anyone to check if a code exists to facilitate activation flow
-      allow get: if true;
-      
-      // Only admins can list or manage codes
-      allow list: if isAdmin();
+      allow get: if isSignedIn();
+      allow list: if isAdmin(); // only admins can list all codes
       allow create, delete: if isAdmin() || (isSignedIn() && incoming().adminSecret == 'BIGBEN2026');
-      
-      // Allow users to mark a code as used when they activate
       allow update: if isSignedIn() &&
                     existing().isUsed == false &&
                     incoming().isUsed == true && 
@@ -67,35 +74,22 @@ service cloud.firestore {
                     incoming().usedBy == request.auth.uid;
     }
 
-    // Leaderboard
-    match /leaderboard/{userId} {
-      allow read: if true;
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
-      allow update: if isSignedIn() && request.auth.uid == userId && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['name', 'score', 'groupId', 'attemptedQuestions', 'localBackup', 'lastUpdate']);
-      allow delete: if isAdmin();
-    }
-
-    // User Activations (Cloud recovery of subscription)
-    match /user_activations/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Sprints & Results
+    // Sprints
     match /sprints/{sprintId} {
-      allow read: if true;
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidSprint(incoming());
       allow update: if isSignedIn() && (
-        existing().hostId == request.auth.uid || 
-        isAdmin()
+        (existing().hostId == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasAny(['status', 'startTime', 'duration', 'currentRound', 'participantCount', 'questions'])) ||
+        (incoming().hostId == request.auth.uid && isValidSprint(incoming()))
       );
-      allow delete: if isAdmin() || (isSignedIn() && existing().hostId == request.auth.uid);
+      allow delete: if isSignedIn();
       
-      match /results/{participantId} {
-        allow read: if true;
+      match /results/{userId} {
+        allow read: if isSignedIn();
         allow create: if isSignedIn() && isValidResult(incoming());
-        allow update: if isSignedIn() && (request.auth.uid == participantId || isAdmin());
-        allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == participantId);
+        allow update: if isSignedIn() && isOwner(userId) && isValidResult(incoming());
+        allow delete: if isSignedIn();
       }
     }
   }

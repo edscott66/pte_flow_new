@@ -3,6 +3,9 @@ import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, orde
 import { 
   getAuth, 
   signInAnonymously, 
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
   initializeAuth
 } from 'firebase/auth';
 // @ts-ignore
@@ -48,6 +51,28 @@ if (isWeb) {
 
 export const auth = authInstance;
 
+export const signInWithGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    if (typeof signInWithPopup !== 'function') {
+      throw new Error("signInWithPopup is not available in this environment.");
+    }
+    const result = await signInWithPopup(auth, provider);
+    return result;
+  } catch (error) {
+    console.error("Google Sign In failed:", error);
+    if (typeof signInWithRedirect === 'function') {
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectError) {
+        console.error("Google Sign In Redirect failed:", redirectError);
+      }
+    } else {
+      console.warn("signInWithRedirect is also not available.");
+    }
+  }
+};
+
 // Error handling helper
 export enum OperationType {
   CREATE = 'create',
@@ -88,36 +113,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Ensure anonymous auth for security rules if needed
 export const ensureAuth = async () => {
-  // If already signed in, return immediately
-  if (auth.currentUser) return auth.currentUser;
-  
-  // If auto-login is prevented (e.g. during logout/welcome), respect that if desired
-  // However, for core functionality like checking activations, we usually NEED auth
-  
-  return new Promise((resolve, reject) => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      unsubscribe();
-      if (user) {
-        resolve(user);
-      } else if (!preventAutoLogin) {
-        try {
-          const result = await signInAnonymously(auth);
-          resolve(result.user);
-        } catch (error) {
-          console.error("Firebase Anonymous Auth failed:", error);
-          reject(error);
-        }
-      } else {
-        // If auto login is prevented and no user, we might be in a state where we can't act
-        resolve(null);
-      }
-    });
-
-    // Timeout after 5 seconds to prevent hanging
-    setTimeout(() => {
-      unsubscribe();
-      resolve(auth.currentUser);
-    }, 5000);
-  });
+  if (!auth.currentUser && !preventAutoLogin) {
+    try {
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error("Firebase Anonymous Auth failed:", error);
+    }
+  }
 };
 

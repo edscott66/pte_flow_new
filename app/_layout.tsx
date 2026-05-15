@@ -2,11 +2,12 @@ import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-rout
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db, auth, ensureAuth } from '../services/firebase';
+import { db } from '../services/firebase';
 import { scoreService } from '../services/scoreService';
 import { Alert, View, TouchableOpacity, Animated, Image, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { auth } from '../services/firebase';
 
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
@@ -19,85 +20,73 @@ function RootLayoutContent() {
   const [targetRoute, setTargetRoute] = useState<string | null>(null);
 
   useEffect(() => {
-    // Combined initialization to avoid race conditions
-    const initializeApp = async () => {
-      const checkSubscriptionAndRestore = async (user: any) => {
-        try {
-          const userId = user?.uid;
+    // Check Subscription Status and Attempt Cloud Restore
+    const checkSubscriptionAndRestore = async () => {
+      try {
+        const userId = auth.currentUser?.uid;
+        
+        // First check local subscription
+        let { daysRemaining, isActivated, isExpired } = await scoreService.getSubscriptionStatus();
+        
+        // If not activated locally, try to restore from cloud
+        if (!isActivated && userId) {
+          console.log("[Layout] Local activation not found, attempting cloud restore...");
           
-          // First check local subscription
-          let { daysRemaining, isActivated, isExpired } = await scoreService.getSubscriptionStatus();
+          const userActivationRef = doc(db, 'user_activations', userId);
+          const activationSnap = await getDoc(userActivationRef);
           
-          // If not activated locally, try to restore from cloud
-          if (!isActivated && userId) {
-            console.log("[Layout] Local activation not found, attempting cloud restore for:", userId);
-            
-            const userActivationRef = doc(db, 'user_activations', userId);
-            const activationSnap = await getDoc(userActivationRef);
-            
-            if (activationSnap.exists()) {
-              const activationData = activationSnap.data();
-              if (activationData.subscriptionStartDate) {
-                // Restore subscription from cloud
-                await scoreService.setSubscriptionStartDate(activationData.subscriptionStartDate);
-                console.log("[Layout] Successfully restored subscription from cloud");
-                
-                // Re-check status after restore
-                const restoredStatus = await scoreService.getSubscriptionStatus();
-                isActivated = restoredStatus.isActivated;
-                isExpired = restoredStatus.isExpired;
-                daysRemaining = restoredStatus.daysRemaining;
-              }
+          if (activationSnap.exists()) {
+            const activationData = activationSnap.data();
+            if (activationData.subscriptionStartDate) {
+              // Restore subscription from cloud
+              await scoreService.setSubscriptionStartDate(activationData.subscriptionStartDate);
+              console.log("[Layout] Successfully restored subscription from cloud");
+              
+              // Re-check status after restore
+              const restoredStatus = await scoreService.getSubscriptionStatus();
+              isActivated = restoredStatus.isActivated;
+              isExpired = restoredStatus.isExpired;
+              daysRemaining = restoredStatus.daysRemaining;
             }
-          }
-          
-          const isActivateScreen = segments[0] === 'activate';
-          
-          // Handle navigation based on activation status
-          if (!isActivated || isExpired) {
-            if (!isActivateScreen) {
-              console.log("[Layout] Need to redirect to activate screen (Activated:", isActivated, "Expired:", isExpired, ")");
-              setTargetRoute('/activate');
-            }
-          } else {
-            // User is activated, ensure they're not on activate screen
-            if (isActivateScreen) {
-              setTargetRoute('/');
-            }
-            
-            // Show warning for expiring soon (3 days or less)
-            if (daysRemaining <= 3 && daysRemaining > 0) {
-              Alert.alert(
-                "Subscription Alert",
-                `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
-                [{ text: "OK" }]
-              );
-            }
-          }
-        } catch (error) {
-          console.error("[Layout] Error in subscription check:", error);
-          // On error, default to showing activate screen to be safe if NOT already there
-          const isActivateScreen = segments[0] === 'activate';
-          if (!isActivateScreen) {
-            setTargetRoute('/activate');
           }
         }
-      };
-
-      try {
-        // 1. Ensure the user is signed in anonymously at least
-        const user = await ensureAuth();
         
-        // 2. Check Subscription Status and Attempt Cloud Restore
-        await checkSubscriptionAndRestore(user);
+        const isActivateScreen = segments[0] === 'activate';
+        
+        // Handle navigation based on activation status
+        if (!isActivated || isExpired) {
+          if (!isActivateScreen) {
+            console.log("[Layout] Need to redirect to activate screen");
+            setTargetRoute('/activate');
+          }
+        } else {
+          // User is activated, ensure they're not on activate screen
+          if (isActivateScreen) {
+            setTargetRoute('/');
+          }
+          
+          // Show warning for expiring soon (3 days or less)
+          if (daysRemaining <= 3 && daysRemaining > 0) {
+            Alert.alert(
+              "Subscription Alert",
+              `Your subscription will expire in ${Math.max(0, daysRemaining)} days. After that, the app will no longer work. Please renew your subscription to continue using the app.`,
+              [{ text: "OK" }]
+            );
+          }
+        }
       } catch (error) {
-        console.error("[Layout] Initialization error:", error);
+        console.error("[Layout] Error in subscription check:", error);
+        // On error, default to showing activate screen to be safe
+        const isActivateScreen = segments[0] === 'activate';
+        if (!isActivateScreen) {
+          setTargetRoute('/activate');
+        }
       } finally {
         setIsRestoring(false);
       }
     };
     
-    initializeApp();
+    checkSubscriptionAndRestore();
 
     // Listen for Global Reset Signal
     const unsubscribe = onSnapshot(doc(db, 'config', 'reset'), async (snapshot: any) => {
