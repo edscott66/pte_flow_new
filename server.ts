@@ -9,14 +9,28 @@ import getDailyGoalsHandler from "./api/get_daily_goals";
 // Fallback for __dirname if needed, though process.cwd() is safer
 const currentDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
 
-// Strict production detection
-const distPath = path.resolve(process.cwd(), "dist");
-// Only trust isProd if NODE_ENV is production or running deep inside dist
-const isProd = process.env.NODE_ENV === "production" || currentDir.includes("dist");
+// Detect production mode
+const isProd = process.env.NODE_ENV === "production";
+
+// Robust distPath resolution
+let distPath: string;
+if (isProd) {
+  // Try common deployment paths
+  const possiblePaths = [
+    __dirname,
+    path.join(process.cwd(), "dist"),
+    path.join(process.cwd(), "web-build"), // Expo's default sometimes
+  ];
+  
+  const found = possiblePaths.find(p => fs.existsSync(path.join(p, "index.html")));
+  distPath = found || path.resolve(process.cwd(), "dist");
+} else {
+  distPath = path.resolve(process.cwd(), "dist");
+}
 
 
 async function startServer() {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = 3000;
   const app = express();
 
   console.log(`[FORENSIC] Booting Server...`);

@@ -289,21 +289,22 @@ export const analyzeWriting = async (userSummary: string, originalTranscript: st
       - feedback (string, summary)
       - sectionFeedback (object with keys: content, grammar, vocabulary, spelling, structure, form, linguisticRange. Each value is a detailed coaching string)
       - breakdown (object with keys: grammar, vocabulary, spelling, content, structure, form, linguistic)
+      - modelAnswer (string): Write a top-scoring (90/90) model response for this prompt.
     `;
 
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: { 
         responseMimeType: "application/json",
-        maxOutputTokens: 1500,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        maxOutputTokens: 8000,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             overall: { type: Type.NUMBER },
             feedback: { type: Type.STRING },
+            modelAnswer: { type: Type.STRING },
             sectionFeedback: {
               type: Type.OBJECT,
               properties: {
@@ -331,7 +332,7 @@ export const analyzeWriting = async (userSummary: string, originalTranscript: st
               required: ["grammar", "vocabulary", "spelling", "content", "structure", "form", "linguistic"]
             }
           },
-          required: ["overall", "feedback", "sectionFeedback", "breakdown"]
+          required: ["overall", "feedback", "sectionFeedback", "breakdown", "modelAnswer"]
         }
       }
     });
@@ -342,6 +343,7 @@ export const analyzeWriting = async (userSummary: string, originalTranscript: st
     return {
       overall: res.overall || 0,
       feedback: res.feedback || "Analysis complete.",
+      modelAnswer: res.modelAnswer || "",
       sectionFeedback: res.sectionFeedback,
       breakdown: res.breakdown
     };

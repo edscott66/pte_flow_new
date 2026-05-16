@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './firebase';
 
 const ATTEMPTED_QUESTIONS_KEY = 'pte_flow_attempted_questions';
-const TOTAL_SCORE_KEY = 'pte_flow_total_score';
+const TOTAL_SCORE_KEY = 'pte_flow_leaderboard_score_v2';
 const USER_NAME_KEY = 'pte_flow_user_name';
 const ORIGINAL_SSID_KEY = 'pte_flow_original_ssid';
 const IS_CREATOR_KEY = 'pte_flow_is_creator';
@@ -345,7 +345,7 @@ export const scoreService = {
       ATTEMPTED_QUESTIONS_KEY, TOTAL_SCORE_KEY, ORIGINAL_SSID_KEY,
       PERFORMANCE_DATA_KEY, RECENT_ACTIVITY_KEY, TARGET_SCORE_KEY,
       AVATAR_URI_KEY, STREAK_KEY, LAST_STUDY_DATE_KEY, TOTAL_STUDY_TIME_KEY,
-      MISTAKES_BANK_KEY, CORRECT_FIRST_ATTEMPT_KEY, FAILED_FIRST_ATTEMPT_KEY, GROUP_ID_KEY
+      MISTAKES_BANK_KEY, CORRECT_FIRST_ATTEMPT_KEY, FAILED_FIRST_ATTEMPT_KEY
     ];
     for (const key of keys) {
       const val = await AsyncStorage.getItem(key);
@@ -388,7 +388,8 @@ export const scoreService = {
       TARGET_SCORE_KEY,
       GROUP_ID_KEY,
       CORRECT_FIRST_ATTEMPT_KEY,
-      FAILED_FIRST_ATTEMPT_KEY
+      FAILED_FIRST_ATTEMPT_KEY,
+      USER_NAME_KEY
     ];
     try {
       await AsyncStorage.multiRemove(keys);
@@ -399,33 +400,29 @@ export const scoreService = {
   },
 
   // Call this when the user deliberately resets their own progress
-  // (the "Reset My Progress" button in Settings). This is the only
-  // place that should wipe CFA/FFA.
+  // (the "Reset My Progress" button in Settings).
+  // AS PER REQUEST: This will reset leaderboard score to 0, reset CFA/FFA, but keep the GroupID.
   async clearProgressOnly() {
-    console.log("[ScoreService] Wiping full progress including CFA/FFA...");
-    const keys = [
+    console.log("[ScoreService] Resetting leaderboard score and progress report...");
+    const keysToWipe = [
       ATTEMPTED_QUESTIONS_KEY,
       TOTAL_SCORE_KEY,
-      ORIGINAL_SSID_KEY,
       RECENT_ACTIVITY_KEY,
       STREAK_KEY,
       LAST_STUDY_DATE_KEY,
       TOTAL_STUDY_TIME_KEY,
-      'pte_flow_user_id',
-      'pte_flow_leaderboard_hidden',
       PERFORMANCE_DATA_KEY,
       MISTAKES_BANK_KEY,
-      AVATAR_URI_KEY,
-      TARGET_SCORE_KEY,
-      GROUP_ID_KEY,
       CORRECT_FIRST_ATTEMPT_KEY,
       FAILED_FIRST_ATTEMPT_KEY
     ];
     try {
-      await AsyncStorage.multiRemove(keys);
-      console.log("[ScoreService] Full progress wipe complete.");
+      await AsyncStorage.multiRemove(keysToWipe);
+      // Explicitly set score to 0
+      await AsyncStorage.setItem(TOTAL_SCORE_KEY, '0');
+      console.log("[ScoreService] Progress reset complete. Group kept.");
     } catch (e) {
-      console.error("[ScoreService] Full wipe failed:", e);
+      console.error("[ScoreService] Reset failed:", e);
     }
   },
 

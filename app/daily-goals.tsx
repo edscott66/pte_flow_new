@@ -880,7 +880,7 @@ export default function DailyGoalsScreen() {
             </View>
             <TouchableOpacity 
               style={styles.startBtn}
-              onPress={() => router.push({ pathname: `/module/${task.module_id || 'mock-exam'}`, params: { startIndex: 'random' } })}
+              onPress={() => router.push({ pathname: `/module/${task.module_id || 'mock-exam'}` as any, params: { startIndex: 'random' } })}
             >
               <MaterialCommunityIcons name="play" size={20} color="#fff" />
             </TouchableOpacity>

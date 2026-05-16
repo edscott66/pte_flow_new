@@ -129,13 +129,6 @@ export default function WelcomeScreen() {
             }
 
             if (legacyData) {
-                if (legacyData.score > currentScore) {
-                    currentScore = legacyData.score;
-                    await scoreService.setScore(currentScore);
-                }
-                if (legacyData.groupId) {
-                    await scoreService.setGroupId(legacyData.groupId);
-                }
                 const legacyAttempted = legacyData.attemptedQuestions || [];
                 const localAttempted = await scoreService.getAttemptedQuestions();
                 const merged = Array.from(new Set([...localAttempted, ...legacyAttempted]));
@@ -145,33 +138,36 @@ export default function WelcomeScreen() {
                 if (legacyData.localBackup) {
                     console.log(`[Firebase Sync] Restoring local backup keys:`, Object.keys(legacyData.localBackup));
                     await scoreService.restoreLocalData(legacyData.localBackup);
-                    // Update variables that might have been loaded before this block
-                    currentScore = await scoreService.getScore();
+                    // Critical: Never restore old Group ID from backup, even if it exists in legacy data
+                    await AsyncStorage.removeItem('pte_flow_group_id');
+                    // Explicitly set score to 0 to respect 'fresh install must start at zero'
+                    await scoreService.setScore(0);
+                    currentScore = 0;
                 }
             }
             await AsyncStorage.setItem('pte_flow_has_synced_v2', 'true');
-            await AsyncStorage.setItem('pte_flow_user_id', userId);
         }
+        await AsyncStorage.setItem('pte_flow_user_id', userId);
 
         let groupId = await scoreService.getGroupId();
         
-        if (!groupId) {
-          groupId = userId;
-          await scoreService.setGroupId(userId);
-        }
-
         // Generate full local backup to sync to Firebase
         const localBackup = await scoreService.getAllLocalData();
 
-        await setDoc(userDocRef, {
+        const updateData: any = {
           userId,
           name: userName,
           score: currentScore,
-          groupId: groupId,
           attemptedQuestions: attempted,
           localBackup,
           lastUpdate: new Date().toISOString()
-        }, { merge: true });
+        };
+
+        if (groupId) {
+            updateData.groupId = groupId;
+        }
+
+        await setDoc(userDocRef, updateData, { merge: true });
         console.log("User successfully synced to Firebase Leaderboard");
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `leaderboard/${userId}`);

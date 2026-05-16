@@ -173,8 +173,9 @@ const ListeningFillBlanksContent = React.memo(({ item, lFibAnswers, lFibResult, 
   return (
     <ScrollView 
         style={{flex: 1}} 
-        contentContainerStyle={{paddingBottom: 40}}
+        contentContainerStyle={{paddingBottom: 80}}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
     >
       <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: 4}}>
         {item.segments.map((segment: string, i: number) => {
@@ -239,12 +240,12 @@ export default function ModuleScreen() {
     headerTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, textAlign: 'center', lineHeight: 20 },
     carouselContainer: { },
     fullScreenPage: { width: width, padding: 20 },
-    card: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+    card: { flex: 1, backgroundColor: colors.surface, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
     questionIndex: { color: colors.subtext, marginBottom: 10, fontWeight: 'bold' },
     questionText: { fontSize: 20, lineHeight: 30, color: colors.text },
     readingText: { fontSize: 16, lineHeight: 24, color: colors.text },
     label: { fontSize: 12, color: colors.subtext, fontWeight: 'bold', marginBottom: 4 },
-    textScroll: { width: '100%', minHeight: 100, marginBottom: 10, },
+    textScroll: { flex: 1, width: '100%', minHeight: 100, marginBottom: 10, },
     textScrollContent: { flexGrow: 1, justifyContent: 'center' },
     audioPlaceholder: { justifyContent: 'center', alignItems: 'center', width: '100%' },
     listenBox: { alignItems: 'center', gap: 10 },
@@ -437,27 +438,36 @@ export default function ModuleScreen() {
         const firebaseUid = auth.currentUser?.uid;
         
         if (firebaseUid) {
-          const newScore = await scoreService.addPoint();
-          console.log(`[Score] Global Leaderboard Points: ${newScore}`);
+          let groupId = await scoreService.getGroupId();
           
-          const canEdit = await networkService.canEditTable();
-          if (canEdit) {
-            const name = await scoreService.getUserName();
-            if (name) {
-              try {
-                await ensureAuth();
-                const userDocRef = doc(db, 'leaderboard', firebaseUid);
-                const localBackup = await scoreService.getAllLocalData();
-                await setDoc(userDocRef, {
-                  score: newScore,
-                  localBackup,
-                  lastUpdate: new Date().toISOString()
-                }, { merge: true });
-                console.log("[Score] Global sync successful.");
-              } catch (e) {
-                console.error("Firebase sync failed:", e);
+          // Only add points to the Global Leaderboard if a group has been formed
+          if (groupId) {
+            const newScore = await scoreService.addPoint();
+            console.log(`[Score] Global Leaderboard Points: ${newScore}`);
+            
+            const canEdit = await networkService.canEditTable();
+            if (canEdit) {
+              const name = await scoreService.getUserName();
+              if (name) {
+                try {
+                  await ensureAuth();
+                  const userDocRef = doc(db, 'leaderboard', firebaseUid);
+                  const localBackup = await scoreService.getAllLocalData();
+                  const updateData: any = {
+                    score: newScore,
+                    localBackup,
+                    lastUpdate: new Date().toISOString(),
+                    groupId: groupId
+                  };
+                  await setDoc(userDocRef, updateData, { merge: true });
+                  console.log("[Score] Global sync successful.");
+                } catch (e) {
+                  console.error("Firebase sync failed:", e);
+                }
               }
             }
+          } else {
+            console.log("[Score] Leaderboard inactive (no group formed). Points remain at zero.");
           }
         } else {
           console.log(`[Score] Unauthenticated. Global score unchanged.`);
@@ -1452,7 +1462,7 @@ export default function ModuleScreen() {
       setScoredQuestions(prev => ({...prev, [currentIndex]: pts}));
       awardPointIfFirstAttempt(pts >= 0.8);
       setMode('RESULT');
-    } catch (error) { Alert.alert("Error", "AI Scoring failed."); setMode('IDLE'); }
+    } catch (error: any) { Alert.alert("Error", `AI Scoring failed: ${error.message || String(error)}`); setMode('IDLE'); }
   };
 
   const handleEssaySubmit = async () => {
@@ -1893,7 +1903,11 @@ export default function ModuleScreen() {
         {isFillBlanks && ( 
           <View style={{flex: 1}}>
             <Text style={styles.reOrderTitle}>{item.title}</Text>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fibContainer}>
+            <ScrollView 
+                style={{ flex: 1 }} 
+                contentContainerStyle={[styles.fibContainer, { paddingBottom: 60 }]}
+                nestedScrollEnabled={true}
+            >
               <View style={[styles.fibTextWrapper, { paddingHorizontal: 4 }]}>
                 {item.segments.map((segment: string, i: number) => {
                   const words = segment.split(/(\s+)/);
@@ -1932,7 +1946,12 @@ export default function ModuleScreen() {
         )}
         {isFillBlanksRW && (
           <View style={{flex: 1}}>
-            <ScrollView style={{flex: 1}} keyboardShouldPersistTaps="handled">
+            <ScrollView 
+                style={{flex: 1}} 
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+                contentContainerStyle={{ paddingBottom: 60 }}
+            >
               <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, paddingHorizontal: 4}}>
                 {item.segments.map((segment: string, i: number) => {
                   const words = segment.split(/(\s+)/);
@@ -1968,15 +1987,13 @@ export default function ModuleScreen() {
         {isFillBlanksListening && (
           <View style={{flex: 1}}>
             {mode !== 'RESULT' ? (
-              <>
-                <ListeningFillBlanksContent 
-                    item={item} 
-                    lFibAnswers={lFibAnswers} 
-                    lFibResult={lFibResult} 
-                    handleLFibChange={handleLFibChange} 
-                    styles={styles}
-                />
-              </>
+              <ListeningFillBlanksContent 
+                  item={item} 
+                  lFibAnswers={lFibAnswers} 
+                  lFibResult={lFibResult} 
+                  handleLFibChange={handleLFibChange} 
+                  styles={styles}
+              />
             ) : (
               <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
                 <MaterialCommunityIcons name="headphones" size={60} color="#10B981" />
@@ -2150,7 +2167,7 @@ export default function ModuleScreen() {
             {isSummarizeWritten && (
               <View style={{marginBottom: 10}}>
                 <Text style={styles.reOrderTitle}>{item.title}</Text>
-                <ScrollView style={[styles.sourceTextBox, mode !== 'RESULT' ? { height: isKeyboardVisible ? 100 : 250 } : { flex: 1 }]} nestedScrollEnabled={true}><Text style={styles.readingText}>{item.text}</Text></ScrollView>
+                <View style={[styles.sourceTextBox, { minHeight: 150 }]}><Text style={styles.readingText}>{item.text}</Text></View>
               </View>
             )}
             {isSummarizeSpoken && (
